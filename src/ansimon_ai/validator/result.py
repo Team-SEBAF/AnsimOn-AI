@@ -1,6 +1,6 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional
 
 class ValidationStatus(str, Enum):
     PASS = "pass"
@@ -11,7 +11,7 @@ class ValidationStatus(str, Enum):
 class ValidationMessage:
     code: str
     message: str
-    field: str | None = None
+    field: Optional[str] = None
 
 @dataclass
 class ValidationResult:
