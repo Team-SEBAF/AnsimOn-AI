@@ -1,0 +1,12 @@
+[project]
+name = "ansimon-ai"
+version = "0.1.0"
+description = "AnsimOn AI core logic"
+requires-python = ">=3.11"
+
+dependencies = [
+    "pydantic>=2.6",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
