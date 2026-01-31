@@ -17,6 +17,6 @@ AnsimOn AI core repository.
 
 ## Non-goals
 - API server
-- OCR / STT clients
 - Authentication / billing
 - Database access
+- Production-grade OCR / STT client integrations
