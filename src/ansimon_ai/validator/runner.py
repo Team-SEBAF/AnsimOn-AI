@@ -1,4 +1,6 @@
-from typing import Callable, List
+from __future__ import annotations
+
+from typing import Callable, Iterable, List
 
 from ansimon_ai.validator.result import (
     ValidationResult,
@@ -6,7 +8,8 @@ from ansimon_ai.validator.result import (
     ValidationMessage,
 )
 
-ValidatorFn = Callable[[dict], ValidationMessage | None]
+ValidatorReturn = ValidationMessage | ValidationResult | Iterable[ValidationMessage] | None
+ValidatorFn = Callable[[dict], ValidatorReturn]
 
 class ValidatorRunner:
     def __init__(self, validators: List[ValidatorFn] | None = None):
@@ -17,13 +20,26 @@ class ValidatorRunner:
 
     def run(self, data: dict) -> ValidationResult:
         messages: List[ValidationMessage] = []
+        explicit_statuses: List[ValidationStatus] = []
 
         for validator in self.validators:
-            msg = validator(data)
-            if msg:
-                messages.append(msg)
+            out = validator(data)
+            if out is None:
+                continue
 
-        status = self._decide_status(messages)
+            if isinstance(out, ValidationResult):
+                explicit_statuses.append(out.status)
+                messages.extend(out.messages)
+                continue
+
+            if isinstance(out, ValidationMessage):
+                messages.append(out)
+                continue
+
+            # Iterable[ValidationMessage]
+            messages.extend(list(out))
+
+        status = self._decide_status(messages, explicit_statuses)
 
         return ValidationResult(
             status=status,
@@ -31,7 +47,18 @@ class ValidatorRunner:
         )
 
     @staticmethod
-    def _decide_status(messages: List[ValidationMessage]) -> ValidationStatus:
+    def _decide_status(
+        messages: List[ValidationMessage],
+        explicit_statuses: List[ValidationStatus],
+    ) -> ValidationStatus:
+        if explicit_statuses:
+            # Prefer explicit results reported by rules. 'FAIL' dominates.
+            if any(s == ValidationStatus.FAIL for s in explicit_statuses):
+                return ValidationStatus.FAIL
+            if any(s == ValidationStatus.WARN for s in explicit_statuses):
+                return ValidationStatus.WARN
+            return ValidationStatus.PASS
+
         if not messages:
             return ValidationStatus.PASS
 
