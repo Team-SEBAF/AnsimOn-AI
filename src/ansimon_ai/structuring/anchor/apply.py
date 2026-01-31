@@ -1,5 +1,6 @@
 from copy import deepcopy
 from typing import Any, Dict
+import unicodedata
 
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher, EvidenceAnchor
 
@@ -11,11 +12,13 @@ def apply_anchors(
 ) -> Dict[str, Any]:
     result = deepcopy(structuring_result)
 
+    normalized_full_text = unicodedata.normalize("NFC", full_text)
+
     def walk(node: Any) -> None:
         if isinstance(node, dict):
             if "evidence_span" in node and node["evidence_span"]:
                 anchor: EvidenceAnchor | None = matcher.match(
-                    full_text=full_text,
+                    full_text=normalized_full_text,
                     evidence_span=node["evidence_span"],
                 )
 
