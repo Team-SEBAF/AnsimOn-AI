@@ -32,10 +32,10 @@ class MockLLMClient(LLMClient):
                 "evidence_anchor": None,
             },
             "frequency": {
-                "value": "unknown",
-                "confidence": "low",
-                "evidence_span": None,
-                "evidence_anchor": None,
+            "value": "거의 매일",
+            "confidence": "high",
+            "evidence_span": "거의 매일",
+            "evidence_anchor": None
             },
             "channel": {
                 "value": ["unknown"],
