@@ -2,6 +2,12 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import List, Optional
 
+@dataclass(frozen=True)
+class ValidationError:
+    code: str
+    field: str
+    message: Optional[str] = None
+
 class ValidationStatus(str, Enum):
     PASS = "pass"
     WARN = "warn"
