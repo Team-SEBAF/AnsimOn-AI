@@ -17,18 +17,17 @@ class AnchorMatcher:
         if not evidence_span:
             return None
 
-        full_nfc = unicodedata.normalize("NFC", full_text)
-        span_nfc = unicodedata.normalize("NFC", evidence_span)
-
-        if not span_nfc:
+        full = unicodedata.normalize("NFC", full_text)
+        span = unicodedata.normalize("NFC", evidence_span).strip()
+        if not span:
             return None
 
         matches: List[int] = []
         start = 0
-        span_len = len(span_nfc)
+        span_len = len(span)
 
         while True:
-            idx = full_nfc.find(span_nfc, start)
+            idx = full.find(span, start)
             if idx == -1:
                 break
 
