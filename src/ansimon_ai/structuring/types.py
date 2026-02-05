@@ -20,14 +20,16 @@ class AnchorStats(BaseModel):
     unmatched_spans: int
     notes: Optional[str] = None
 
-class VlidationResult(BaseModel):
+class ValidationResult(BaseModel):
     status: Literal["PASS", "FAIL", "WARN"]
     error_codes: List[str]
     message: Optional[str] = None
+
+VlidationResult = ValidationResult
 
 class StructuringResult(BaseModel):
     output_json: Dict[str, Any]
     cache_hit: bool
     anchor_stats: AnchorStats
-    validation: VlidationResult
+    validation: ValidationResult
     run_id: Optional[str] = None
