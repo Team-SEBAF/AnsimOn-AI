@@ -3,8 +3,6 @@ from .types import STTResult, STTSegment
 
 class MockSTT(STTEngine):
     def transcribe(self, audio_path: str) -> STTResult:
-        # NOTE: v0 단계에서는 실제 오디오 대신 "텍스트"를 넘겨 데모를 돌릴 수 있게
-        # 입력 문자열을 그대로 full_text로 사용합니다.
         text = (audio_path or "").strip()
         if text:
             segments = [
