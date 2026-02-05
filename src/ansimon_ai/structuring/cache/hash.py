@@ -26,10 +26,9 @@ def compute_input_hash(
     schema_version: str,
     prompt_version: str,
 ) -> str:
+    # Ensure the payload is JSON-serializable (Pydantic models -> plain dicts)
     base_payload = {
-        "modality": "text",
-        "full_text": struct_input.full_text,
-        "segments": struct_input.segments,
+        **struct_input.model_dump(),
         "schema_version": schema_version,
         "prompt_version": prompt_version,
     }
