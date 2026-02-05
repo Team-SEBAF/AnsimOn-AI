@@ -3,13 +3,15 @@ from ansimon_ai.structuring.types import (
     StructuringInput,
     StructuringResult,
     AnchorStats,
-    VlidationResult,
+    ValidationResult,
 )
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.cache.hash import compute_input_hash
 from ansimon_ai.structuring.call import call_structuring_ai
 from ansimon_ai.structuring.anchor.apply import apply_anchors
 from ansimon_ai.structuring.anchor.store import collect_anchors, save_anchors
+from ansimon_ai.structuring.tags.generate import generate_evidence_tags
+from ansimon_ai.structuring.tags.types import EvidenceTag
 
 SCHEMA_VERSION = "v1.3"
 PROMPT_VERSION = "v1.0"
@@ -88,7 +90,7 @@ def run_structuring_pipeline(
     # 5. validation
     raw_validation = validator.validate(anchored_json)
 
-    validation_result = VlidationResult(
+    validation_result = ValidationResult(
         status=raw_validation.get("status", "FAIL"),
         error_codes=raw_validation.get("error_codes", []),
         message=raw_validation.get("message"),
@@ -96,11 +98,30 @@ def run_structuring_pipeline(
 
     # 6. collect result
     result = StructuringResult(
-        output_json=output_json,
+        output_json=anchored_json,
         cache_hit=cache_hit,
         anchor_stats=anchor_stats,
         validation=validation_result,
-        run_id=None,
+        run_id=cache_key,
     )
 
     return result
+
+def run_structuring_pipeline_with_tags(
+        *,
+        input: StructuringInput,
+        llm_client,
+        anchor_matcher: AnchorMatcher,
+        validator,
+        cache: Optional[object] = None,
+) -> tuple[StructuringResult, list[EvidenceTag]]:
+    result = run_structuring_pipeline(
+        input=input,
+        llm_client=llm_client,
+        anchor_matcher=anchor_matcher,
+        validator=validator,
+        cache=cache,
+    )
+
+    evidence_tags = generate_evidence_tags(result=result)
+    return result, evidence_tags
