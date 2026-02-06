@@ -12,6 +12,7 @@ from ansimon_ai.structuring.anchor.apply import apply_anchors
 from ansimon_ai.structuring.anchor.store import collect_anchors, save_anchors
 from ansimon_ai.structuring.tags.generate import generate_evidence_tags
 from ansimon_ai.structuring.tags.types import EvidenceTag
+from ansimon_ai.trial.signals_v0.generate import generate_trial_signals_v0_from_structuring
 
 SCHEMA_VERSION = "v1.3"
 PROMPT_VERSION = "v1.0"
@@ -125,3 +126,28 @@ def run_structuring_pipeline_with_tags(
 
     evidence_tags = generate_evidence_tags(result=result)
     return result, evidence_tags
+
+def run_structuring_pipeline_with_tags_and_trial_signals_v0(
+        *,
+        input: StructuringInput,
+        llm_client,
+        anchor_matcher: AnchorMatcher,
+        validator,
+        cache: Optional[object] = None,
+        max_trial_evidence: int = 3,
+):
+    result, evidence_tags = run_structuring_pipeline_with_tags(
+        input=input,
+        llm_client=llm_client,
+        anchor_matcher=anchor_matcher,
+        validator=validator,
+        cache=cache,
+    )
+
+    trial = generate_trial_signals_v0_from_structuring(
+        result=result,
+        tags=evidence_tags,
+        max_evidence=max_trial_evidence,
+    )
+
+    return result, evidence_tags, trial
