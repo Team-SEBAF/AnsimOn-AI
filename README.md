@@ -25,6 +25,14 @@ AnsimOn AI core repository.
   - `CONFIDENCE_WITHOUT_ANCHOR` → `warn`
   - 그 외(구조 유효 + 경고 없음) → `pass`
 
+### Requirement State v0 Scope
+- `EvidenceTag[]`(+ tag-validator 결과)를 기반으로 “요건 평가 가능 상태”만 분류한다.
+- 출력: `RequirementState(EVALUATABLE|UNSTABLE|INVALID)`
+- 정책(v0):
+  - `INVALID`  ↔ `ValidationStatus.fail`
+  - `UNSTABLE` ↔ `ValidationStatus.warn`
+  - `EVALUATABLE` ↔ `ValidationStatus.pass`
+
 ## Non-goals
 - API server
 - Authentication / billing
