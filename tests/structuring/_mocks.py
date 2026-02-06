@@ -1,5 +1,3 @@
-import json
-
 class MockValidator:
     def validate(self, output_json):
         return {

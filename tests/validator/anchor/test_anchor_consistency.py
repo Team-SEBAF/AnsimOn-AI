@@ -1,5 +1,3 @@
-import pytest
-
 from ansimon_ai.validator.runner import ValidatorRunner
 from ansimon_ai.validator.rules.anchor_consistency import (
     validate_anchor_consistency,
