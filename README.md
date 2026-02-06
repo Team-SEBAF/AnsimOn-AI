@@ -33,6 +33,27 @@ AnsimOn AI core repository.
   - `UNSTABLE` ↔ `ValidationStatus.warn`
   - `EVALUATABLE` ↔ `ValidationStatus.pass`
 
+## [TRIAL] Signals v0
+법적 판단/결론을 만들지 않고, UI가 요구하는 "신호 수준(level)"만 근거 재현 가능하게 생성하는 **파생 출력(derived output)** 이다.
+
+- 입력(모드1): 원문 텍스트
+- 입력(모드2): v1.3 구조화 결과 + EvidenceTag[]
+- 출력 공통: `mode`, `version`, `summary`, `signals[]`
+- `signals[]`: `name`, `level`, `reason_codes[]`, `evidence[]`
+  - `evidence[]`는 가능하면 `evidence_span` + `evidence_anchor(start_char/end_char)`를 포함
+  - `evidence[]`가 비어 있을 수 있으며(근거 매칭 실패/근거 풀 없음 등), 이 경우 `reason_codes[]`로 “근거 부족”을 명시
+  - `reason_codes[]` 네이밍(최소 규칙): `T_`(text), `E_`(위험/에러), `W_`(경고), `P_`(통과) 접두어 + 대문자/숫자/`_` (`^[TEWP]_[A-Z0-9_]+$`)
+
+### `signals.name` ↔ UI 항목 매핑
+| signals.name | UI 항목(예시 라벨) | mode |
+|---|---|---|
+| `repetition` | 반복 | text |
+| `threat` | 위협 | text |
+| `refusal` | 거절/거부 | text |
+| `evidence_strength` | 증거 강도 | evidence |
+| `clarity` | 명확성(근거 재현 가능성) | evidence |
+| `safety` | 안전(파이프라인 상태) | evidence |
+
 ## Non-goals
 - API server
 - Authentication / billing
