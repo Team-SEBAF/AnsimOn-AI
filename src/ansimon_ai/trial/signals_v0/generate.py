@@ -14,6 +14,15 @@ from ansimon_ai.trial.signals_v0.types import (
 from ansimon_ai.validator.result import ValidationStatus
 from ansimon_ai.validator.tag_validator_v0 import validate_evidence_tags_v0
 
+DEFAULT_FULL_TEXT_MAX_CHARS = 1000
+DEFAULT_EVIDENCE_SPAN_MAX_CHARS = 240
+DEFAULT_SUMMARY_MAX_CHARS = 80
+DEFAULT_REASON_CODES_MAX_ITEMS = 8
+
+W_INPUT_TRUNCATED = "W_INPUT_TRUNCATED"
+W_EVIDENCE_TRUNCATED = "W_EVIDENCE_TRUNCATED"
+W_OUTPUT_TRUNCATED = "W_OUTPUT_TRUNCATED"
+
 @dataclass(frozen=True)
 class _SpanMatch:
     span: str
@@ -44,6 +53,79 @@ def _make_text_evidence(*, full_text: str, match: _SpanMatch) -> TrialSignalEvid
         source="text",
         source_field=None,
     )
+
+def _truncate_text(*, text: str, max_chars: int) -> tuple[str, bool]:
+    if max_chars <= 0:
+        return "", bool(text)
+
+    if len(text) <= max_chars:
+        return text, False
+
+    return text[:max_chars], True
+
+def _truncate_evidence(*, ev: TrialSignalEvidenceV0, max_chars: int) -> tuple[TrialSignalEvidenceV0, bool]:
+    if max_chars <= 0:
+        if not ev.evidence_span:
+            return ev, False
+
+        return (
+            TrialSignalEvidenceV0(
+                evidence_span="",
+                evidence_anchor=ev.evidence_anchor,
+                source=ev.source,
+                source_field=ev.source_field,
+            ),
+            True,
+        )
+
+    if len(ev.evidence_span) <= max_chars:
+        return ev, False
+
+    new_span = ev.evidence_span[:max_chars]
+
+    new_anchor = ev.evidence_anchor
+    if new_anchor is not None:
+        if isinstance(new_anchor, dict):
+            start = new_anchor.get("start_char")
+            end = new_anchor.get("end_char")
+            if isinstance(start, int) and isinstance(end, int):
+                new_end = min(end, start + len(new_span))
+                new_anchor = {**new_anchor, "end_char": new_end}
+        else:
+            start = getattr(new_anchor, "start_char", None)
+            end = getattr(new_anchor, "end_char", None)
+            modality = getattr(new_anchor, "modality", None)
+            if isinstance(start, int) and isinstance(end, int) and isinstance(modality, str):
+                new_end = min(end, start + len(new_span))
+                new_anchor = {
+                    "modality": modality,
+                    "start_char": start,
+                    "end_char": new_end,
+                }
+
+    return (
+        TrialSignalEvidenceV0(
+            evidence_span=new_span,
+            evidence_anchor=new_anchor,
+            source=ev.source,
+            source_field=ev.source_field,
+        ),
+        True,
+    )
+
+def _cap_reason_codes(*, codes: List[str], max_items: int) -> tuple[List[str], bool]:
+    if max_items <= 0:
+        return [], bool(codes)
+
+    if len(codes) <= max_items:
+        return codes, False
+
+    kept = codes[: max_items - 1]
+    kept.append(W_OUTPUT_TRUNCATED)
+    return kept, True
+
+def _cap_summary(*, summary: str, max_chars: int) -> tuple[str, bool]:
+    return _truncate_text(text=summary, max_chars=max_chars)
 
 def _repetition_level(full_text: str) -> tuple[str, List[str], List[TrialSignalEvidenceV0]]:
     tokens = [t.strip() for t in re.split(r"\s+", full_text) if t.strip()]
@@ -103,19 +185,67 @@ def _refusal_level(full_text: str) -> tuple[str, List[str], List[TrialSignalEvid
 
     return "충분", ["T_REFUSAL_KEYWORD_MATCH"], [_make_text_evidence(full_text=full_text, match=match)]
 
-def generate_trial_signals_v0_from_text(*, full_text: str) -> TrialSignalsOutputV0:
+def generate_trial_signals_v0_from_text(
+    *,
+    full_text: str,
+    full_text_max_chars: int = DEFAULT_FULL_TEXT_MAX_CHARS,
+    evidence_span_max_chars: int = DEFAULT_EVIDENCE_SPAN_MAX_CHARS,
+    summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
+    reason_codes_max_items: int = DEFAULT_REASON_CODES_MAX_ITEMS,
+) -> TrialSignalsOutputV0:
+    full_text, input_truncated = _truncate_text(text=full_text, max_chars=full_text_max_chars)
+
     rep_level, rep_codes, rep_ev = _repetition_level(full_text)
     thr_level, thr_codes, thr_ev = _threat_level(full_text)
     ref_level, ref_codes, ref_ev = _refusal_level(full_text)
 
+    if input_truncated:
+        rep_codes = rep_codes + [W_INPUT_TRUNCATED]
+        thr_codes = thr_codes + [W_INPUT_TRUNCATED]
+        ref_codes = ref_codes + [W_INPUT_TRUNCATED]
+
+    rep_ev2: List[TrialSignalEvidenceV0] = []
+    rep_ev_trunc = False
+    for ev in rep_ev:
+        ev2, trunc = _truncate_evidence(ev=ev, max_chars=evidence_span_max_chars)
+        rep_ev2.append(ev2)
+        rep_ev_trunc = rep_ev_trunc or trunc
+
+    thr_ev2: List[TrialSignalEvidenceV0] = []
+    thr_ev_trunc = False
+    for ev in thr_ev:
+        ev2, trunc = _truncate_evidence(ev=ev, max_chars=evidence_span_max_chars)
+        thr_ev2.append(ev2)
+        thr_ev_trunc = thr_ev_trunc or trunc
+
+    ref_ev2: List[TrialSignalEvidenceV0] = []
+    ref_ev_trunc = False
+    for ev in ref_ev:
+        ev2, trunc = _truncate_evidence(ev=ev, max_chars=evidence_span_max_chars)
+        ref_ev2.append(ev2)
+        ref_ev_trunc = ref_ev_trunc or trunc
+
+    if rep_ev_trunc:
+        rep_codes = rep_codes + [W_EVIDENCE_TRUNCATED]
+    if thr_ev_trunc:
+        thr_codes = thr_codes + [W_EVIDENCE_TRUNCATED]
+    if ref_ev_trunc:
+        ref_codes = ref_codes + [W_EVIDENCE_TRUNCATED]
+
+    rep_codes, _ = _cap_reason_codes(codes=rep_codes, max_items=reason_codes_max_items)
+    thr_codes, _ = _cap_reason_codes(codes=thr_codes, max_items=reason_codes_max_items)
+    ref_codes, _ = _cap_reason_codes(codes=ref_codes, max_items=reason_codes_max_items)
+
+    summary, _ = _cap_summary(summary="TRIAL signals v0 (text)", max_chars=summary_max_chars)
+
     return TrialSignalsOutputV0(
         mode="text",
         version="v0",
-        summary="TRIAL signals v0 (text)",
+        summary=summary,
         signals=[
-            TrialSignalV0(name="repetition", level=rep_level, reason_codes=rep_codes, evidence=rep_ev),
-            TrialSignalV0(name="threat", level=thr_level, reason_codes=thr_codes, evidence=thr_ev),
-            TrialSignalV0(name="refusal", level=ref_level, reason_codes=ref_codes, evidence=ref_ev),
+            TrialSignalV0(name="repetition", level=rep_level, reason_codes=rep_codes, evidence=rep_ev2),
+            TrialSignalV0(name="threat", level=thr_level, reason_codes=thr_codes, evidence=thr_ev2),
+            TrialSignalV0(name="refusal", level=ref_level, reason_codes=ref_codes, evidence=ref_ev2),
         ],
     )
 
@@ -158,11 +288,20 @@ def generate_trial_signals_v0_from_structuring(
     result: StructuringResult,
     tags: Sequence[EvidenceTag],
     max_evidence: int = 3,
+    evidence_span_max_chars: int = DEFAULT_EVIDENCE_SPAN_MAX_CHARS,
+    summary_max_chars: int = DEFAULT_SUMMARY_MAX_CHARS,
+    reason_codes_max_items: int = DEFAULT_REASON_CODES_MAX_ITEMS,
 ) -> TrialSignalsOutputV0:
     tag_validation = validate_evidence_tags_v0(tags=tags)
     tag_values = {t.tag for t in tags}
 
-    evidence_pool = _extract_structured_evidence_pool(result=result, max_evidence=max_evidence)
+    evidence_pool0 = _extract_structured_evidence_pool(result=result, max_evidence=max_evidence)
+    evidence_pool: List[TrialSignalEvidenceV0] = []
+    evidence_truncated = False
+    for ev in evidence_pool0:
+        ev2, trunc = _truncate_evidence(ev=ev, max_chars=evidence_span_max_chars)
+        evidence_pool.append(ev2)
+        evidence_truncated = evidence_truncated or trunc
 
     conf_values: List[str] = []
     if isinstance(result.output_json, dict):
@@ -214,10 +353,21 @@ def generate_trial_signals_v0_from_structuring(
         safety_level = "안전"
         safety_codes = ["P_TAG_VALIDATION_PASS"]
 
+    if evidence_truncated:
+        strength_codes = strength_codes + [W_EVIDENCE_TRUNCATED]
+        clarity_codes = clarity_codes + [W_EVIDENCE_TRUNCATED]
+        safety_codes = safety_codes + [W_EVIDENCE_TRUNCATED]
+
+    strength_codes, _ = _cap_reason_codes(codes=strength_codes, max_items=reason_codes_max_items)
+    clarity_codes, _ = _cap_reason_codes(codes=clarity_codes, max_items=reason_codes_max_items)
+    safety_codes, _ = _cap_reason_codes(codes=safety_codes, max_items=reason_codes_max_items)
+
+    summary, _ = _cap_summary(summary="TRIAL signals v0 (evidence)", max_chars=summary_max_chars)
+
     return TrialSignalsOutputV0(
         mode="evidence",
         version="v0",
-        summary="TRIAL signals v0 (evidence)",
+        summary=summary,
         signals=[
             TrialSignalV0(
                 name="evidence_strength",
