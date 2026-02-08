@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable, Literal
+from typing import Callable
 
 from ansimon_ai.structuring.cache.hash import compute_input_hash
 from ansimon_ai.structuring.types import StructuringInput, StructuringResult
