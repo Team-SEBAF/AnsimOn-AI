@@ -19,6 +19,7 @@ def test_apply_anchor_success_single():
     )
 
     assert result["harassment"]["evidence_anchor"] == {
+        "modality": "text",
         "start_char": 3,
         "end_char": 13,
     }

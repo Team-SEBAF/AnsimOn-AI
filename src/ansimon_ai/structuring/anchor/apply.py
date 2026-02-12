@@ -26,6 +26,7 @@ def apply_anchors(
                     node["evidence_anchor"] = None
                 else:
                     node["evidence_anchor"] = {
+                        "modality": "text",
                         "start_char": anchor.start_char,
                         "end_char": anchor.end_char,
                     }
