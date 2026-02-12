@@ -1,0 +1,196 @@
+{
+  "version": "evalset_v0",
+  "name": "eval_full_v0",
+  "cases": [
+    {
+      "case_id": "FULL_001_anchor_ok",
+      "input": {
+        "kind": "text",
+        "text": "전남친이 지난달부터 거의 매일 전화하고 집 앞에 와서 기다렸어요."
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "EVALUATABLE",
+          "reason_codes_contains": []
+        },
+        "event_io": {
+          "policy": "allow",
+          "can_create_event": true,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "pass",
+          "codes_contains": []
+        }
+      }
+    },
+    {
+      "case_id": "FULL_002_anchor_missing",
+      "input": {
+        "kind": "text",
+        "text": "전남친이 지난달부터 전화하고 집 앞에 와서 기다렸어요."
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "UNSTABLE",
+          "reason_codes_contains": [
+            "W_ANCHOR_NOT_FOUND",
+            "W_CONFIDENCE_WITHOUT_ANCHOR"
+          ]
+        },
+        "event_io": {
+          "policy": "allow_with_caution",
+          "can_create_event": true,
+          "caution_tag": "UNSTABLE"
+        },
+        "tag_validation": {
+          "status": "warn",
+          "codes_contains": [
+            "W_ANCHOR_NOT_FOUND",
+            "W_CONFIDENCE_WITHOUT_ANCHOR"
+          ]
+        }
+      }
+    }
+    ,
+    {
+      "case_id": "FULL_003_invalid_confidence",
+      "input": {
+        "kind": "text",
+        "text": "dummy"
+      },
+      "mock_llm_output_json": {
+        "evidence_metadata": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "parties": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "period": {"confidence": "sure", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "frequency": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "channel": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "locations": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "action_types": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "refusal_signal": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "threat_indicators": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "impact_on_victim": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "report_or_record": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"}
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "INVALID",
+          "reason_codes_contains": ["E_STRUCT_INVALID"]
+        },
+        "event_io": {
+          "policy": "deny",
+          "can_create_event": false,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "fail",
+          "codes_contains": ["E_STRUCT_INVALID"]
+        }
+      }
+    },
+    {
+      "case_id": "FULL_004_anchor_without_span",
+      "input": {
+        "kind": "text",
+        "text": "dummy"
+      },
+      "mock_llm_output_json": {
+        "evidence_metadata": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "parties": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "period": {"confidence": "low", "evidence_span": null, "evidence_anchor": {"modality": "text", "start_char": 0, "end_char": 3}, "value": "unknown"},
+        "frequency": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "channel": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "locations": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "action_types": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "refusal_signal": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "threat_indicators": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "impact_on_victim": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "report_or_record": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"}
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "INVALID",
+          "reason_codes_contains": ["E_STRUCT_INVALID"]
+        },
+        "event_io": {
+          "policy": "deny",
+          "can_create_event": false,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "fail",
+          "codes_contains": ["E_STRUCT_INVALID"]
+        }
+      }
+    },
+    {
+      "case_id": "FULL_005_missing_required_top_key",
+      "input": {
+        "kind": "text",
+        "text": "dummy"
+      },
+      "mock_llm_output_json": {
+        "evidence_metadata": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "parties": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "frequency": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "channel": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "locations": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "action_types": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "refusal_signal": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "threat_indicators": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "impact_on_victim": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "report_or_record": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"}
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "INVALID",
+          "reason_codes_contains": ["E_STRUCT_INVALID"]
+        },
+        "event_io": {
+          "policy": "deny",
+          "can_create_event": false,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "fail",
+          "codes_contains": ["E_STRUCT_INVALID"]
+        }
+      }
+    },
+    {
+      "case_id": "FULL_006_invalid_anchor_modality",
+      "input": {
+        "kind": "text",
+        "text": "dummy"
+      },
+      "mock_llm_output_json": {
+        "evidence_metadata": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "parties": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": {}},
+        "period": {"confidence": "low", "evidence_span": "", "evidence_anchor": {"modality": "audio", "start_char": 0, "end_char": 1}, "value": "unknown"},
+        "frequency": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "channel": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "locations": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "action_types": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "refusal_signal": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"},
+        "threat_indicators": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "impact_on_victim": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": []},
+        "report_or_record": {"confidence": "low", "evidence_span": null, "evidence_anchor": null, "value": "unknown"}
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "INVALID",
+          "reason_codes_contains": ["E_STRUCT_INVALID"]
+        },
+        "event_io": {
+          "policy": "deny",
+          "can_create_event": false,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "fail",
+          "codes_contains": ["E_STRUCT_INVALID"]
+        }
+      }
+    }
+  ]
+}
