@@ -1,0 +1,56 @@
+{
+  "version": "evalset_v0",
+  "name": "eval_smoke_v0",
+  "cases": [
+    {
+      "case_id": "SMOKE_001_anchor_ok",
+      "input": {
+        "kind": "text",
+        "text": "전남친이 지난달부터 거의 매일 전화하고 집 앞에 와서 기다렸어요."
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "EVALUATABLE",
+          "reason_codes_contains": []
+        },
+        "event_io": {
+          "policy": "allow",
+          "can_create_event": true,
+          "caution_tag": null
+        },
+        "tag_validation": {
+          "status": "pass",
+          "codes_contains": []
+        }
+      }
+    },
+    {
+      "case_id": "SMOKE_002_anchor_missing",
+      "input": {
+        "kind": "text",
+        "text": "전남친이 지난달부터 전화하고 집 앞에 와서 기다렸어요."
+      },
+      "expected": {
+        "requirement_state": {
+          "state": "UNSTABLE",
+          "reason_codes_contains": [
+            "W_ANCHOR_NOT_FOUND",
+            "W_CONFIDENCE_WITHOUT_ANCHOR"
+          ]
+        },
+        "event_io": {
+          "policy": "allow_with_caution",
+          "can_create_event": true,
+          "caution_tag": "UNSTABLE"
+        },
+        "tag_validation": {
+          "status": "warn",
+          "codes_contains": [
+            "W_ANCHOR_NOT_FOUND",
+            "W_CONFIDENCE_WITHOUT_ANCHOR"
+          ]
+        }
+      }
+    }
+  ]
+}
