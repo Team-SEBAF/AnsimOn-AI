@@ -25,8 +25,14 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
-# --- Local scripts ---
-scripts/
+# --- Helper scripts ---
+scripts/*
+!scripts/run_eval_v0.py
 
 # --- Runtime data artifacts ---
-data/
+data/*
+!data/evalsets/
+!data/evalsets/**
+
+# --- Local eval outputs ---
+data/evalsets/**/_last_*.jsonl
