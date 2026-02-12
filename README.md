@@ -7,6 +7,13 @@ AnsimOn AI core repository.
 - Validator (policy-level rules)
 - Evaluation / regression tests
 
+## Eval (regression) v0
+- 고정 입력(평가셋 v0)을 기반으로 구조화 결과/태그/RequirementState/Event I/O 계약 회귀 감지
+- 운영: CI는 smoke만 실행, 전체(full)는 로컬/수동 실행
+- 로컬 실행(전체): `python scripts/run_eval_v0.py`
+- CI 실행(스모크): `python scripts/run_eval_v0.py --suite smoke`
+- 출력: 케이스별 `PASS|WARN|FAIL`, `reason_codes`, `usage_metrics`(v0: `duration_ms`, `input_chars`, `output_chars`, `cache_hit`)
+
 ## Pipeline Overview
 - 입력(Evidence text) → v1.3 구조화(JSON) → anchor 적용/근거 재현(evidence_span/anchor)
 - Validator v0.1-α: 스키마/공통 필드 정합성 검증(의미 해석/법적 판단 없음)
