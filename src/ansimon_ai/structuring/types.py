@@ -8,7 +8,7 @@ class StructuringSegment(BaseModel):
 
 class StructuringInput(BaseModel):
     modality: Literal["text"]
-    source_type: Literal["stt"]
+    source_type: Literal["stt", "ocr"]
     language: Optional[str]
     full_text: str
     segments: List[StructuringSegment]
