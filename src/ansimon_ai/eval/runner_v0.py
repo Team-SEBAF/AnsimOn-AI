@@ -61,7 +61,7 @@ def _compare_case(
     *,
     case: EvalCaseV0,
     actual_requirement_state: str,
-    actual_reason_codes: List[str],
+    actual_requirement_reason_codes: List[str],
     actual_policy: str,
     actual_can_create_event: bool,
     actual_caution_tag: Optional[str],
@@ -75,7 +75,7 @@ def _compare_case(
 
     if not _subset_contains(
         required=case.expected.requirement_state.reason_codes_contains,
-        actual=actual_reason_codes,
+        actual=actual_requirement_reason_codes,
     ):
         mismatches.append("E_REQ_REASON_CODES_MISSING")
 
@@ -159,18 +159,19 @@ def run_eval_case_v0(
         duration_ms = int((time.perf_counter() - t0) * 1000)
         output_chars = _json_size_chars(result.output_json)
 
-        actual_reason_codes = [m.code for m in req.tag_validation.messages]
+        actual_requirement_reason_codes = list(req.requirement_state.reason_codes)
+        actual_tag_validation_codes = [m.code for m in req.tag_validation.messages]
         actual_requirement_state = req.requirement_state.state.value
 
         contract_ok, mismatch_codes = _compare_case(
             case=case,
             actual_requirement_state=actual_requirement_state,
-            actual_reason_codes=actual_reason_codes,
+            actual_requirement_reason_codes=actual_requirement_reason_codes,
             actual_policy=req.event_io.policy,
             actual_can_create_event=req.event_io.can_create_event,
             actual_caution_tag=req.event_io.caution_tag,
             tag_validation_status=req.tag_validation.status.value,
-            tag_validation_codes=[m.code for m in req.tag_validation.messages],
+            tag_validation_codes=actual_tag_validation_codes,
         )
         if not contract_ok:
             status: EvalCaseStatus = "fail"
@@ -180,8 +181,9 @@ def run_eval_case_v0(
             status = "pass"
 
         reason_codes: List[str] = []
-        reason_codes.extend(mismatch_codes)
-        reason_codes.extend(actual_reason_codes)
+        for code in [*mismatch_codes, *actual_requirement_reason_codes, *actual_tag_validation_codes]:
+            if code not in reason_codes:
+                reason_codes.append(code)
 
         usage = UsageMetricsV0(
             duration_ms=duration_ms,
@@ -201,11 +203,11 @@ def run_eval_case_v0(
             "tags": [t.model_dump() for t in tags],
             "tag_validation": {
                 "status": req.tag_validation.status.value,
-                "codes": [m.code for m in req.tag_validation.messages],
+                "codes": list(actual_tag_validation_codes),
             },
             "requirement_state": {
                 "state": actual_requirement_state,
-                "reason_codes": list(actual_reason_codes),
+                "reason_codes": list(actual_requirement_reason_codes),
             },
             "event_io": {
                 "policy": req.event_io.policy,
