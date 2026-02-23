@@ -1,6 +1,5 @@
 import os
 import pytest
-from PIL import Image
 
 from ansimon_ai.ocr.types import OCRSegment, OCRResult
 from ansimon_ai.ocr.from_ocr import build_structuring_input_from_ocr, ocr_image_to_result
