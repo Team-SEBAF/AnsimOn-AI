@@ -24,6 +24,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
           python -m pip install pytest ruff
+          python -m pip install pytesseract
 
       - name: Lint (ruff)
         run: ruff check src tests
