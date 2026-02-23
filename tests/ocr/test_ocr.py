@@ -3,6 +3,7 @@ import pytest
 
 from ansimon_ai.ocr.types import OCRSegment, OCRResult
 from ansimon_ai.ocr.from_ocr import build_structuring_input_from_ocr, ocr_image_to_result
+from ansimon_ai.structuring.tag_patterns import extract_tags_from_structuring_input
 
 def make_ocr_result(segments, full_text):
     return OCRResult(
@@ -57,12 +58,12 @@ def test_counseling_record():
     assert len(struct_input.segments) == 2
 
 @pytest.mark.skipif(
-    not os.path.exists("D:\\sample.png"),
+    not os.path.exists("D:\\sample2.png"),
     reason="예시 이미지 파일이 존재하지 않음"
 )
 
 def test_ocr_image_integration():
-    image_path = "D:\\sample.png"
+    image_path = "D:\\sample2.png"
     if not os.path.exists(image_path):
         pytest.skip(f"테스트 이미지 없음: {image_path}")
     result = ocr_image_to_result(image_path)
@@ -70,3 +71,36 @@ def test_ocr_image_integration():
     assert hasattr(result, "full_text")
     assert hasattr(result, "segments")
     assert isinstance(result.segments, list)
+
+def test_tag_extraction_threat():
+    segments = [
+        OCRSegment(text="2024.06.01 15:20 김철수: 너 오늘 집에 안 들어오면 가만 안 둘 거야."),
+        OCRSegment(text="2024.06.01 15:21 김철수: 경찰에 신고해봐야 소용없어."),
+        OCRSegment(text="2024.06.01 15:22 김철수: 네가 한 일 다 알고 있어."),
+    ]
+    full_text = " ".join([s.text for s in segments])
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+    tags = extract_tags_from_structuring_input(struct_input)
+    assert "threat" in tags
+
+def test_tag_extraction_sexual():
+    segments = [
+        OCRSegment(text="오늘따라 야하다"),
+        OCRSegment(text="가슴이 참 예쁘네"),
+        OCRSegment(text="야한 사진 보내줘"),
+    ]
+    full_text = " ".join([s.text for s in segments])
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+    tags = extract_tags_from_structuring_input(struct_input)
+    assert "sexual" in tags
+
+def test_tag_extraction_refusal():
+    segments = [
+        OCRSegment(text="그만해"),
+        OCRSegment(text="연락하지 말라"),
+        OCRSegment(text="싫다"),
+    ]
+    full_text = " ".join([s.text for s in segments])
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+    tags = extract_tags_from_structuring_input(struct_input)
+    assert "refusal" in tags
