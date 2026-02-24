@@ -25,6 +25,8 @@ jobs:
           python -m pip install -e .
           python -m pip install pytest ruff
           python -m pip install pytesseract
+          python -m pip install openai-whisper
+          python -m pip install ffmpeg-python
 
       - name: Lint (ruff)
         run: ruff check src tests
