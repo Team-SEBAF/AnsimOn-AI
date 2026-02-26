@@ -1,3 +1,4 @@
+import os
 import pytest
 from ansimon_ai.pdf.extract_text_auto import extract_text_auto
 
@@ -6,6 +7,8 @@ from ansimon_ai.pdf.extract_text_auto import extract_text_auto
     r"D:\Project\AnsimOn\진료기록부.pdf",
 ])
 def test_extract_text_auto(pdf_path):
+    if not os.path.exists(pdf_path):
+        pytest.skip(f"테스트용 PDF 파일이 없습니다: {pdf_path}")
     texts = extract_text_auto(pdf_path)
     assert isinstance(texts, list)
     assert all(isinstance(t, str) for t in texts)
