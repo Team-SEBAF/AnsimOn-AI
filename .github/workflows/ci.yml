@@ -27,6 +27,9 @@ jobs:
           python -m pip install pytesseract
           python -m pip install openai-whisper
           python -m pip install ffmpeg-python
+          python -m pip install pdf2image pdfplumber
+          sudo apt-get update
+          sudo apt-get install -y poppler-utils
 
       - name: Lint (ruff)
         run: ruff check src tests
