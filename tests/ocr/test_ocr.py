@@ -92,7 +92,7 @@ def test_tag_extraction_sexual():
     full_text = " ".join([s.text for s in segments])
     struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
     tags = extract_tags_from_structuring_input(struct_input)
-    assert "sexual" in tags
+    assert "sexual_insult" in tags
 
 def test_tag_extraction_refusal():
     segments = [
