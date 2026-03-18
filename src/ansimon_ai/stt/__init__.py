@@ -1,7 +1,11 @@
 from .types import STTResult, STTSegment
 from .base import STTEngine
 from .mock import MockSTT
-from .whisper_stt import WhisperSTT
+
+try:
+    from .whisper_stt import WhisperSTT
+except ModuleNotFoundError:
+    WhisperSTT = None
 
 __all__ = [
     "STTResult",

@@ -10,7 +10,7 @@ def load_system_prompt() -> str:
 
 def build_structuring_messages(struct_input: StructuringInput) -> list[dict]:
     segments_json = json.dumps(
-        [seg.model_dump() for seg in struct_input.segments],
+        [seg.model_dump(mode="json") for seg in struct_input.segments],
         ensure_ascii=False,
         indent=2,
     )

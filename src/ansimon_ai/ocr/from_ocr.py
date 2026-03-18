@@ -1,10 +1,12 @@
 import os
-import pytesseract
+from datetime import datetime
+from typing import Optional
+
 from .types import OCRResult
 from .types import OCRSegment
-from PIL import Image
 
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
+from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 
 def preprocess_ocr_segments(segments):
     processed = []
@@ -18,7 +20,10 @@ def preprocess_ocr_segments(segments):
         processed.append({**seg.model_dump(), "text": text, "start": start, "end": end})
     return processed
 
-def build_structuring_input_from_ocr(ocr: OCRResult) -> StructuringInput:
+def build_structuring_input_from_ocr(
+    ocr: OCRResult,
+    metadata_fallback_timestamp: Optional[datetime] = None,
+) -> StructuringInput:
     segments = preprocess_ocr_segments(ocr.segments)
     return StructuringInput(
         modality="text",
@@ -30,12 +35,19 @@ def build_structuring_input_from_ocr(ocr: OCRResult) -> StructuringInput:
                 text=seg.get("text", ""),
                 start=seg.get("start") if seg.get("start") is not None else 0.0,
                 end=seg.get("end") if seg.get("end") is not None else 0.0,
+                timestamp=extract_timestamp(
+                    seg.get("text", ""),
+                    fallback=metadata_fallback_timestamp,
+                ),
             )
             for seg in segments
         ],
     )
 
 def ocr_image_to_result(image_path: str) -> OCRResult:
+    import pytesseract
+    from PIL import Image
+
     tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
     if os.name == "nt" and os.path.exists(tesseract_cmd):
         pytesseract.pytesseract.tesseract_cmd = tesseract_cmd
