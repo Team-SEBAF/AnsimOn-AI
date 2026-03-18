@@ -1,14 +1,16 @@
 from pydantic import BaseModel
 from typing import List, Optional, Literal, Dict, Any
+from datetime import datetime
 
 class StructuringSegment(BaseModel):
     text: str
     start: float
     end: float
-
+    timestamp: Optional[datetime] = None
+    
 class StructuringInput(BaseModel):
     modality: Literal["text"]
-    source_type: Literal["stt", "ocr"]
+    source_type: Literal["stt", "ocr", "document", "text"]
     language: Optional[str]
     full_text: str
     segments: List[StructuringSegment]
