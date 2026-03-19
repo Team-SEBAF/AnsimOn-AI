@@ -8,6 +8,11 @@ __pycache__/
 venv/
 ENV/
 
+# --- Local environment files ---
+.env
+.env.*
+!.env.example
+
 # --- Packaging / build artifacts ---
 *.egg-info/
 build/
