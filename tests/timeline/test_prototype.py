@@ -1,6 +1,5 @@
 from pathlib import Path
 from uuid import uuid4
-from docx import Document
 
 import pytest
 
@@ -11,6 +10,7 @@ from ansimon_ai.timeline import (
     IncidentLogFormInput,
     TimelinePrototypeAiInput,
     TimelinePrototypeEvidenceInput,
+    build_timeline_event_evidences,
     build_timeline_prototype,
 )
 
@@ -64,7 +64,10 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
     assert len(result.items) == 1
     assert result.items[0].date == "2026-03-19"
     assert len(result.items[0].events) == 1
-    assert result.items[0].events[0].evidences[0].title == "incident title"
+    timeline_evidence = result.items[0].events[0].evidences[0]
+    assert timeline_evidence.title == "incident title"
+    assert timeline_evidence.referenced_evidence_count == 1
+    assert timeline_evidence.referenced_evidence_ids == [completed.evidence_id]
 
 def test_build_timeline_prototype_uses_extracted_text_for_report_record():
     payload = TimelinePrototypeAiInput(
@@ -74,7 +77,7 @@ def test_build_timeline_prototype_uses_extracted_text_for_report_record():
                 evidence_id=uuid4(),
                 type="REPORT_RECORD",
                 file_format="TXT",
-                extracted_text="2026-03-18 상담 기록\n반복적으로 연락이 왔다.",
+                extracted_text="2026-03-18 consultation record\nrepeated contact was documented.",
             ),
         ],
     )
@@ -97,8 +100,8 @@ def test_build_timeline_prototype_skips_hwp_report_record_without_extracted_text
                 evidence_id=uuid4(),
                 type="REPORT_RECORD",
                 file_format="HWP",
-                local_path="D:/fake/sample.hwp",
                 file_name="sample.hwp",
+                file_bytes=b"fake-hwp",
             ),
         ],
     )
@@ -120,7 +123,7 @@ def test_build_timeline_prototype_accepts_hwp_report_record_with_extracted_text(
                 evidence_id=uuid4(),
                 type="REPORT_RECORD",
                 file_format="HWP",
-                extracted_text="2026-03-16 상담 내용\n문서에서 추출된 텍스트",
+                extracted_text="2026-03-16 document extraction from hwp content",
                 file_name="sample.hwp",
             ),
         ],
@@ -132,6 +135,66 @@ def test_build_timeline_prototype_accepts_hwp_report_record_with_extracted_text(
     assert evidence_result.status == "completed"
     assert evidence_result.source_type == "document"
     assert result.items[0].date == "2026-03-16"
+
+def test_build_timeline_prototype_processes_incident_log_document_upload():
+    txt_path = _write_test_file(
+        f"{uuid4()}-incident-log.txt",
+        "2026-03-14\nincident log document upload\nactor appeared near workplace".encode("utf-8"),
+    )
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="INCIDENT_LOG",
+                file_format="TXT",
+                file_name="incident-log.txt",
+                file_bytes=txt_path.read_bytes(),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(payload, llm_client=MockLLMClient())
+
+    evidence_result = result.evidence_results[0]
+    timeline_evidence = result.items[0].events[0].evidences[0]
+    assert evidence_result.status == "completed"
+    assert evidence_result.source_type == "document"
+    assert evidence_result.title
+    assert evidence_result.title == timeline_evidence.title
+    assert result.items[0].date == "2026-03-14"
+    assert timeline_evidence.referenced_evidence_ids == [evidence_result.evidence_id]
+
+def test_build_timeline_event_evidences_accumulates_referenced_ids():
+    first_id = uuid4()
+    second_id = uuid4()
+
+    grouped = build_timeline_event_evidences(
+        [
+            {
+                "evidence_id": first_id,
+                "evidence_type": "MESSAGE",
+                "message_group_key": "thread-1",
+                "title": "message evidence",
+                "description": "first",
+                "tags": ["repeat"],
+            },
+            {
+                "evidence_id": second_id,
+                "evidence_type": "MESSAGE",
+                "message_group_key": "thread-1",
+                "title": "message evidence",
+                "description": "second",
+                "tags": ["threat"],
+            },
+        ]
+    )
+
+    assert len(grouped) == 1
+    assert grouped[0]["referenced_evidence_count"] == 2
+    assert grouped[0]["referenced_evidence_ids"] == [first_id, second_id]
+    assert grouped[0]["tags"] == ["repeat", "threat"]
 
 def test_build_timeline_prototype_processes_message_image_with_injected_ocr():
     image_path = _write_test_file(f"{uuid4()}-message.png", b"fake-image")
@@ -155,8 +218,8 @@ def test_build_timeline_prototype_processes_message_image_with_injected_ocr():
                 evidence_id=uuid4(),
                 type="MESSAGE",
                 file_format="IMAGE",
-                local_path=str(image_path),
                 file_name="message.png",
+                file_bytes=image_path.read_bytes(),
             ),
         ],
     )
@@ -183,8 +246,8 @@ def test_build_timeline_prototype_processes_voice_audio_with_injected_stt():
                 evidence_id=uuid4(),
                 type="VOICE",
                 file_format="AUDIO",
-                local_path=str(audio_path),
                 file_name="voice.m4a",
+                file_bytes=audio_path.read_bytes(),
             ),
         ],
     )
@@ -198,16 +261,18 @@ def test_build_timeline_prototype_processes_voice_audio_with_injected_stt():
     evidence_result = result.evidence_results[0]
     assert evidence_result.status == "completed"
     assert evidence_result.source_type == "stt"
-    assert evidence_result.normalized_text == str(audio_path)
+    assert evidence_result.normalized_text is not None
+    assert evidence_result.normalized_text.endswith("voice.m4a")
 
 def test_build_timeline_prototype_processes_docx_report_record():
     pytest.importorskip("docx")
-    
+    from docx import Document
+
     docx_path = _write_test_file(f"{uuid4()}-record.docx", b"")
 
     document = Document()
-    document.add_paragraph("2026-03-15 상담 기록")
-    document.add_paragraph("반복적인 연락이 있었다.")
+    document.add_paragraph("2026-03-15 consultation record")
+    document.add_paragraph("repeated contact was documented")
     document.save(str(docx_path))
 
     payload = TimelinePrototypeAiInput(
@@ -217,8 +282,8 @@ def test_build_timeline_prototype_processes_docx_report_record():
                 evidence_id=uuid4(),
                 type="REPORT_RECORD",
                 file_format="DOCX",
-                local_path=str(docx_path),
                 file_name="record.docx",
+                file_bytes=docx_path.read_bytes(),
             ),
         ],
     )
@@ -229,5 +294,5 @@ def test_build_timeline_prototype_processes_docx_report_record():
     assert evidence_result.status == "completed"
     assert evidence_result.source_type == "document"
     assert evidence_result.normalized_text is not None
-    assert "상담 기록" in evidence_result.normalized_text
+    assert "consultation record" in evidence_result.normalized_text
     assert result.items[0].date == "2026-03-15"
