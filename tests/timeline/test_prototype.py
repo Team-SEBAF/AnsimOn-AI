@@ -1,5 +1,8 @@
 from pathlib import Path
 from uuid import uuid4
+from docx import Document
+
+import pytest
 
 from ansimon_ai.llm.mock import MockLLMClient
 from ansimon_ai.ocr.types import OCRResult, OCRSegment
@@ -106,7 +109,7 @@ def test_build_timeline_prototype_skips_hwp_report_record_without_extracted_text
     assert evidence_result.status == "skipped"
     assert evidence_result.error_code == "UNSUPPORTED_FILE_FORMAT"
     assert evidence_result.error_message is not None
-    assert "require extracted_text" in evidence_result.error_message
+    assert "not supported yet" in evidence_result.error_message
     assert result.items == []
 
 def test_build_timeline_prototype_accepts_hwp_report_record_with_extracted_text():
@@ -196,3 +199,35 @@ def test_build_timeline_prototype_processes_voice_audio_with_injected_stt():
     assert evidence_result.status == "completed"
     assert evidence_result.source_type == "stt"
     assert evidence_result.normalized_text == str(audio_path)
+
+def test_build_timeline_prototype_processes_docx_report_record():
+    pytest.importorskip("docx")
+    
+    docx_path = _write_test_file(f"{uuid4()}-record.docx", b"")
+
+    document = Document()
+    document.add_paragraph("2026-03-15 상담 기록")
+    document.add_paragraph("반복적인 연락이 있었다.")
+    document.save(str(docx_path))
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="REPORT_RECORD",
+                file_format="DOCX",
+                local_path=str(docx_path),
+                file_name="record.docx",
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(payload, llm_client=MockLLMClient())
+
+    evidence_result = result.evidence_results[0]
+    assert evidence_result.status == "completed"
+    assert evidence_result.source_type == "document"
+    assert evidence_result.normalized_text is not None
+    assert "상담 기록" in evidence_result.normalized_text
+    assert result.items[0].date == "2026-03-15"
