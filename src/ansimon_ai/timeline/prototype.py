@@ -272,13 +272,21 @@ def _prepare_report_record_from_file(
         text = Path(evidence.local_path).read_text(encoding="utf-8")
         return _build_document_structuring_input(text), "document"
 
-    if evidence.file_format in {"HWP", "DOCX"}:
+    if evidence.file_format == "DOCX":
+        from ansimon_ai.pdf.extract_text_docx import extract_text_from_docx
+
+        text = extract_text_from_docx(evidence.local_path)
+        if not text.strip():
+            raise ValueError("DOCX text extraction returned empty text.")
+        return _build_document_structuring_input(text), "document"
+
+    if evidence.file_format == "HWP":
         raise NotImplementedError(
-            f"{evidence.file_format} report records require extracted_text in prototype-1."
+            "HWP report records are not supported yet."
         )
 
     raise NotImplementedError(
-        "REPORT_RECORD supports extracted_text for all formats, and direct file handling for PDF or TXT only in prototype-1."
+        "REPORT_RECORD supports extracted_text for all formats, and direct file handling for PDF, TXT, or DOCX only in prototype-1."
     )
 
 def _build_document_structuring_input(text: str) -> StructuringInput:
