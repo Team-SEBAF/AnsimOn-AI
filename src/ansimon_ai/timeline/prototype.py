@@ -155,8 +155,12 @@ def process_single_evidence(
             )
 
         normalized_text = struct_input.full_text.strip()
-        title = _build_title(evidence)
-        description = _build_description(evidence, normalized_text)
+        title = _build_title(evidence, structuring_result.output_json)
+        description = _build_description(
+            evidence,
+            normalized_text,
+            structuring_result.output_json,
+        )
         tags = extract_tags_from_structuring_input(struct_input)
         timestamp = _extract_primary_timestamp(struct_input)
 
@@ -403,7 +407,15 @@ def _incident_log_to_text(evidence: TimelinePrototypeEvidenceInput) -> str:
         ]
     )
 
-def _build_title(evidence: TimelinePrototypeEvidenceInput) -> str:
+def _build_title(
+    evidence: TimelinePrototypeEvidenceInput,
+    structured_data: Optional[dict] = None,
+) -> str:
+    summary = _extract_timeline_summary(structured_data)
+    summary_title = summary.get("title")
+    if isinstance(summary_title, str) and summary_title.strip():
+        return summary_title.strip()
+
     if evidence.type == "INCIDENT_LOG" and evidence.incident_log_form is not None:
         return evidence.incident_log_form.title
 
@@ -418,9 +430,15 @@ def _build_title(evidence: TimelinePrototypeEvidenceInput) -> str:
 def _build_description(
     evidence: TimelinePrototypeEvidenceInput,
     normalized_text: str,
+    structured_data: Optional[dict] = None,
     *,
     limit: int = 280,
 ) -> str:
+    summary = _extract_timeline_summary(structured_data)
+    summary_description = summary.get("description")
+    if isinstance(summary_description, str) and summary_description.strip():
+        return summary_description.strip()
+
     text = normalized_text.strip()
     if not text:
         fallback = evidence.file_name or str(evidence.evidence_id)
@@ -429,6 +447,20 @@ def _build_description(
     if len(text) <= limit:
         return text
     return f"{text[:limit].rstrip()}..."
+
+def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
+    if not isinstance(structured_data, dict):
+        return {}
+
+    summary = structured_data.get("timeline_summary")
+    if not isinstance(summary, dict):
+        return {}
+
+    value = summary.get("value")
+    if not isinstance(value, dict):
+        return {}
+
+    return value
 
 def _extract_primary_timestamp(struct_input: StructuringInput):
     for segment in struct_input.segments:
