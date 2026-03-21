@@ -44,7 +44,16 @@
    - 기존 구조화 필드 판단과 모순되지 않게 작성하라.
    - `title`, `description`은 한국어로 작성하라.
 
-## 출력 스키마 (v1.4)
+11. `tags`는 최종 태그 필드다.
+   - 아래 enum 중에서만 선택하라.
+   - `repeat`
+   - `physical`
+   - `threat`
+   - `sexual_insult`
+   - `refusal`
+   - 근거가 약하면 빈 배열로 둬도 된다.
+
+## 출력 스키마 (v1.5)
 
 ```json
 {
@@ -123,6 +132,12 @@
     "evidence_span": null,
     "evidence_anchor": null
   },
+  "tags": {
+    "value": [],
+    "confidence": "low",
+    "evidence_span": null,
+    "evidence_anchor": null
+  },
   "timeline_summary": {
     "value": {
       "title": "",
@@ -188,6 +203,16 @@
 **report_or_record**
 - `"reported"`, `"consulted"`, `"medical_record"`, `"unknown"` 중 하나
 
+**tags**
+- 최종 태그 값
+- 아래 enum만 사용
+  - `repeat`
+  - `physical`
+  - `threat`
+  - `sexual_insult`
+  - `refusal`
+- 근거가 약하면 빈 배열 허용
+
 ## timeline_summary 작성 가이드
 
 **timeline_summary.value.title**
@@ -199,8 +224,3 @@
 - 타임라인 카드 설명으로 바로 쓸 수 있는 1~2문장 한국어 요약
 - 원문 전체를 길게 복붙하지 말고 핵심만 요약
 - 구조화 결과와 모순되면 안 됨
-
-## 변경 이력
-- prompt v1.1: 기존 구조화 규칙 유지 + `timeline_summary` 추가 (2026-03-21)
-  - schema_version: v1.4
-  - target_model: gpt-5-mini

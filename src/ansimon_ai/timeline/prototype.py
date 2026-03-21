@@ -9,7 +9,6 @@ from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
 from ansimon_ai.structuring.run import run_structuring_pipeline
-from ansimon_ai.structuring.tag_patterns import extract_tags_from_structuring_input
 from ansimon_ai.structuring.types import StructuringInput
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
@@ -161,7 +160,7 @@ def process_single_evidence(
             normalized_text,
             structuring_result.output_json,
         )
-        tags = extract_tags_from_structuring_input(struct_input)
+        tags = _build_tags(structuring_result.output_json)
         timestamp = _extract_primary_timestamp(struct_input)
 
         return EvidenceProcessingResult(
@@ -411,13 +410,13 @@ def _build_title(
     evidence: TimelinePrototypeEvidenceInput,
     structured_data: Optional[dict] = None,
 ) -> str:
+    if evidence.type == "INCIDENT_LOG" and evidence.incident_log_form is not None:
+        return evidence.incident_log_form.title
+
     summary = _extract_timeline_summary(structured_data)
     summary_title = summary.get("title")
     if isinstance(summary_title, str) and summary_title.strip():
         return summary_title.strip()
-
-    if evidence.type == "INCIDENT_LOG" and evidence.incident_log_form is not None:
-        return evidence.incident_log_form.title
 
     mapping = {
         "MESSAGE": "메신저/문자 증거",
@@ -461,6 +460,25 @@ def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
         return {}
 
     return value
+
+def _build_tags(structured_data: Optional[dict]) -> List[str]:
+    if not isinstance(structured_data, dict):
+        return []
+
+    tags_field = structured_data.get("tags")
+    if not isinstance(tags_field, dict):
+        return []
+
+    value = tags_field.get("value")
+    if not isinstance(value, list):
+        return []
+
+    allowed = {"repeat", "physical", "threat", "sexual_insult", "refusal"}
+    result: List[str] = []
+    for tag in value:
+        if isinstance(tag, str) and tag in allowed and tag not in result:
+            result.append(tag)
+    return result
 
 def _extract_primary_timestamp(struct_input: StructuringInput):
     for segment in struct_input.segments:
