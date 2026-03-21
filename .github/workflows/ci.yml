@@ -24,12 +24,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .
           python -m pip install pytest ruff
-          python -m pip install pytesseract
-          python -m pip install openai-whisper
-          python -m pip install ffmpeg-python
-          python -m pip install pdf2image pdfplumber
           sudo apt-get update
-          sudo apt-get install -y poppler-utils
+          sudo apt-get install -y ffmpeg poppler-utils tesseract-ocr tesseract-ocr-kor
 
       - name: Lint (ruff)
         run: ruff check src tests
