@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 from uuid import uuid4
 
 import pytest
@@ -15,6 +16,98 @@ from ansimon_ai.timeline import (
 )
 
 TEST_TMP_DIR = Path("data/_timeline_test_tmp")
+
+class SummaryLLMClient:
+    def generate(self, messages: list[dict]) -> str:
+        return json.dumps(
+            {
+                "evidence_metadata": {
+                    "value": {
+                        "evidence_type": "text",
+                        "source": "unknown",
+                        "sources": ["unknown"],
+                        "created_at": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "parties": {
+                    "value": {
+                        "actor": "unknown",
+                        "target": "unknown",
+                        "relationship": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "period": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "frequency": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "channel": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "locations": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "action_types": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "refusal_signal": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "threat_indicators": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "impact_on_victim": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "report_or_record": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "timeline_summary": {
+                    "value": {
+                        "title": "반복 연락 위협",
+                        "description": "상대방이 반복적으로 연락하며 위협성 발언을 한 정황입니다.",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+            },
+            ensure_ascii=False,
+        )
 
 def _write_test_file(name: str, content: bytes) -> Path:
     TEST_TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,6 +161,29 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
     assert timeline_evidence.title == "incident title"
     assert timeline_evidence.referenced_evidence_count == 1
     assert timeline_evidence.referenced_evidence_ids == [completed.evidence_id]
+
+def test_build_timeline_prototype_prefers_llm_summary_for_title_and_description():
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="REPORT_RECORD",
+                file_format="TXT",
+                extracted_text="2026-03-19 repeated threatening messages were documented.",
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(payload, llm_client=SummaryLLMClient())
+
+    evidence_result = result.evidence_results[0]
+    timeline_evidence = result.items[0].events[0].evidences[0]
+
+    assert evidence_result.title == "반복 연락 위협"
+    assert evidence_result.description == "상대방이 반복적으로 연락하며 위협성 발언을 한 정황입니다."
+    assert timeline_evidence.title == evidence_result.title
+    assert timeline_evidence.description == evidence_result.description
 
 def test_build_timeline_prototype_uses_extracted_text_for_report_record():
     payload = TimelinePrototypeAiInput(
