@@ -412,3 +412,122 @@ def test_build_timeline_prototype_processes_docx_report_record():
     assert evidence_result.normalized_text is not None
     assert "consultation record" in evidence_result.normalized_text
     assert result.items[0].date == "2026-03-15"
+
+class TagOnlyLLMClient:
+    def generate(self, messages: list[dict]) -> str:
+        return json.dumps(
+            {
+                "evidence_metadata": {
+                    "value": {
+                        "evidence_type": "text",
+                        "source": "unknown",
+                        "sources": ["unknown"],
+                        "created_at": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "parties": {
+                    "value": {
+                        "actor": "unknown",
+                        "target": "unknown",
+                        "relationship": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "period": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "frequency": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "channel": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "locations": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "action_types": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "refusal_signal": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "threat_indicators": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "impact_on_victim": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "report_or_record": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "tags": {
+                    "value": ["repeat", "threat"],
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "timeline_summary": {
+                    "value": {
+                        "title": "tag test title",
+                        "description": "tag test description",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+            },
+            ensure_ascii=False,
+        )
+
+def test_build_timeline_prototype_prefers_llm_tags():
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="REPORT_RECORD",
+                file_format="TXT",
+                extracted_text="Repeated threatening contact was documented.",
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(payload, llm_client=TagOnlyLLMClient())
+
+    evidence_result = result.evidence_results[0]
+    timeline_evidence = result.items[0].events[0].evidences[0]
+
+    assert evidence_result.tags == ["repeat", "threat"]
+    assert timeline_evidence.tags == ["repeat", "threat"]
