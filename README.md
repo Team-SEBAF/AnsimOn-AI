@@ -2,6 +2,32 @@
 
 AnsimOn AI core repository.
 
+## 의존성
+
+### 프로젝트 의존성
+프로젝트 의존성은 레포 루트의 `pyproject.toml` 기준으로 관리합니다. 별도 `requirements.txt`는 사용하지 않습니다.
+
+설치:
+
+```bash
+python -m pip install -e .
+```
+
+### 시스템 의존성
+아래 패키지는 OCR, PDF, STT 관련 기능 실행 시 필요합니다.
+
+- `ffmpeg`
+- `poppler-utils`
+- `tesseract-ocr`
+- `tesseract-ocr-kor`
+
+Ubuntu 계열 예시:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y ffmpeg poppler-utils tesseract-ocr tesseract-ocr-kor
+```
+
 ## Scope
 - Evidence text structuring
 - Validator (policy-level rules)
