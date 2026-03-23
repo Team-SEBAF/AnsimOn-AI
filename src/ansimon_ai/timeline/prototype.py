@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
 from typing import List, Optional, Tuple
+from datetime import datetime
 
 from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
