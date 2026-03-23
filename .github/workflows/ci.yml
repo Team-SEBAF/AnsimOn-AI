@@ -32,6 +32,10 @@ jobs:
 
       - name: Test (pytest)
         run: pytest -q
+        env:
+          ENV: local
 
       - name: Eval smoke (v0)
         run: python scripts/run_eval_v0.py --suite smoke
+        env:
+          ENV: local
