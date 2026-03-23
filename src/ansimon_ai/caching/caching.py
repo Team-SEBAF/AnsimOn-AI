@@ -44,6 +44,6 @@ def load_cached_json(hash_key: str) -> dict | None:
     except ClientError as e:
         if e.response["Error"]["Code"] in ("404", "403"):
             return None
-        raise e
+        raise
 
     return json.loads(body.decode("utf-8"))
