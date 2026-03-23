@@ -12,9 +12,9 @@ from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
+from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
-from ansimon_ai.structuring.run import run_structuring_pipeline
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
 from .types import (
