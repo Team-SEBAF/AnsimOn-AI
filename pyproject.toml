@@ -9,11 +9,11 @@ dependencies = [
     "pydantic>=2.6",
     "python-dotenv>=1.0.0",
     "python-docx>=1.1.0",
-    "pytesseract",
-    "Pillow",
-    "pdfplumber",
-    "pdf2image",
-    "openai-whisper",
+    "pytesseract==0.3.13",
+    "Pillow==12.1.1",
+    "pdfplumber==0.11.9",
+    "pdf2image==1.17.0",
+    "openai-whisper==20250625",
 ]
 
 [tool.pytest.ini_options]
