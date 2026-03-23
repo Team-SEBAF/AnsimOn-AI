@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
-from pathlib import Path
 import shutil
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
@@ -10,7 +12,7 @@ from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
 from ansimon_ai.structuring.run import run_structuring_pipeline
-from ansimon_ai.structuring.timestamp_utils import extract_timestamp
+from ansimon_ai.structuring.tag_patterns import extract_tags_from_structuring_input
 from ansimon_ai.structuring.types import StructuringInput
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
@@ -43,32 +45,45 @@ def build_timeline_prototype(
     ocr_runner=None,
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
         anchor_matcher = AnchorMatcher()
     if validator is None:
         validator = StructuringValidatorV0()
 
-    evidence_results: List[EvidenceProcessingResult] = []
+    process_one = partial(
+        process_single_evidence,
+        llm_client=llm_client,
+        anchor_matcher=anchor_matcher,
+        validator=validator,
+        stt_engine=stt_engine,
+        ocr_runner=ocr_runner,
+        cache=cache,
+    )
+    total = len(ai_input.evidences)
+    _evidence_results: List[Optional[EvidenceProcessingResult]] = [None] * total
 
-    for evidence in ai_input.evidences:
-        result = process_single_evidence(
-            evidence,
-            llm_client=llm_client,
-            anchor_matcher=anchor_matcher,
-            validator=validator,
-            stt_engine=stt_engine,
-            ocr_runner=ocr_runner,
-            cache=cache,
-        )
-        evidence_results.append(result)
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        future_to_idx = {
+            executor.submit(process_one, ev): i for i, ev in enumerate(ai_input.evidences)
+        }
+        completed = 0
+        for future in as_completed(future_to_idx):
+            idx = future_to_idx[future]
+            _evidence_results[idx] = future.result()
+            completed += 1
+            if progress_callback is not None:
+                progress_callback(completed, total)
 
+    evidence_results = [r for r in _evidence_results if r is not None]
     items = _assemble_timeline_items(evidence_results)
     return TimelinePrototypeOutput(
         items=items,
         model_version=model_version,
         evidence_results=evidence_results,
     )
+
 
 def process_single_evidence(
     evidence: TimelinePrototypeEvidenceInput,
