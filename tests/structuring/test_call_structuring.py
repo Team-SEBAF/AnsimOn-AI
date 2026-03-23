@@ -26,6 +26,8 @@ def test_call_structuring_ai_smoke():
         "threat_indicators",
         "impact_on_victim",
         "report_or_record",
+        "tags",
+        "timeline_summary",
     }
 
     assert set(result.keys()) == expected_keys
