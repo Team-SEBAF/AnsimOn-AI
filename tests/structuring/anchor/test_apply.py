@@ -82,3 +82,22 @@ def test_apply_does_not_mutate_input():
     )
 
     assert "evidence_anchor" not in structuring["harassment"]
+
+def test_apply_anchor_ignores_non_string_evidence_span():
+    matcher = AnchorMatcher()
+    full_text = "그는 어제 밤에 전화했다."
+
+    structuring = {
+        "harassment": {
+            "value": True,
+            "evidence_span": {"text": "어제 밤에 전화했다"},
+        }
+    }
+
+    result = apply_anchors(
+        structuring_result=structuring,
+        full_text=full_text,
+        matcher=matcher,
+    )
+
+    assert result["harassment"]["evidence_anchor"] is None

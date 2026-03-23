@@ -1,5 +1,6 @@
 from pathlib import Path
 import json
+from datetime import datetime
 from uuid import uuid4
 
 import pytest
@@ -150,6 +151,8 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
     assert completed.source_type == "form"
     assert completed.title == "incident title"
     assert completed.structured_data is not None
+    assert completed.timestamp is not None
+    assert completed.timestamp.isoformat() == "2026-03-19T21:10:00"
 
     assert skipped.status == "skipped"
     assert skipped.error_code == "UNSUPPORTED_EVIDENCE_TYPE"
@@ -351,6 +354,85 @@ def test_build_timeline_prototype_processes_message_image_with_injected_ocr():
     assert evidence_result.source_type == "ocr"
     assert evidence_result.normalized_text is not None
     assert result.items[0].date == "2026-03-17"
+
+def test_build_timeline_prototype_combines_date_and_time_from_message_full_text():
+    image_path = _write_test_file(f"{uuid4()}-message-multi-line.png", b"fake-image")
+
+    def fake_ocr_runner(_image_path: str) -> OCRResult:
+        return OCRResult(
+            full_text="2026년 3월 17일 금요일\n오후 11:20\n위협 메시지가 반복적으로 도착했다",
+            segments=[
+                OCRSegment(text="2026년 3월 17일 금요일"),
+                OCRSegment(text="오후 11:20"),
+                OCRSegment(text="위협 메시지가 반복적으로 도착했다"),
+            ],
+            language="ko",
+            engine="fake-ocr",
+        )
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="MESSAGE",
+                file_format="IMAGE",
+                file_name="message.png",
+                file_bytes=image_path.read_bytes(),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(
+        payload,
+        llm_client=MockLLMClient(),
+        ocr_runner=fake_ocr_runner,
+    )
+
+    evidence_result = result.evidence_results[0]
+    assert evidence_result.timestamp is not None
+    assert evidence_result.timestamp.isoformat() == "2026-03-17T23:20:00"
+    assert result.items[0].date == "2026-03-17"
+    assert result.items[0].events[0].time == "23:20"
+
+def test_build_timeline_prototype_uses_file_created_at_when_text_has_no_timestamp():
+    image_path = _write_test_file(f"{uuid4()}-message-no-timestamp.png", b"fake-image")
+
+    def fake_ocr_runner(_image_path: str) -> OCRResult:
+        return OCRResult(
+            full_text="위협적인 메시지가 반복적으로 도착했다",
+            segments=[
+                OCRSegment(text="위협적인 메시지가 반복적으로 도착했다"),
+            ],
+            language="ko",
+            engine="fake-ocr",
+        )
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="MESSAGE",
+                file_format="IMAGE",
+                file_name="message.png",
+                file_bytes=image_path.read_bytes(),
+                file_created_at=datetime(2026, 3, 18, 8, 45),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(
+        payload,
+        llm_client=MockLLMClient(),
+        ocr_runner=fake_ocr_runner,
+    )
+
+    evidence_result = result.evidence_results[0]
+    assert evidence_result.timestamp is not None
+    assert evidence_result.timestamp.isoformat() == "2026-03-18T08:45:00"
+    assert result.items[0].date == "2026-03-18"
+    assert result.items[0].events[0].time == "08:45"
 
 def test_build_timeline_prototype_processes_voice_audio_with_injected_stt():
     audio_path = _write_test_file(f"{uuid4()}-voice.m4a", b"fake-audio")
