@@ -30,10 +30,10 @@ def get_or_create_structured_result(
         schema_version=schema_version,
         prompt_version=prompt_version,
     )
-    
-    use_local = os.getenv("ENV") == "local"
 
-    if use_local:
+    is_local = os.getenv("ENV") == "local"
+
+    if is_local:
         path_fn = storage_path_fn or _default_storage_path
         path = path_fn(schema_version, input_hash)
         cached = load_structured_result(path)
@@ -56,7 +56,7 @@ def get_or_create_structured_result(
         "result": result,
     }
 
-    if use_local:
+    if is_local:
         save_structured_result(path, payload)
     else:
         from ansimon_ai.caching import cache_json
