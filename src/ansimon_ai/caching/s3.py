@@ -9,9 +9,6 @@ load_dotenv()
 AWS_REGION = os.getenv("AWS_REGION")
 S3_BUCKET_NAME = os.getenv("S3_BUCKET_NAME")
 
-if not S3_BUCKET_NAME or not AWS_REGION:
-    raise RuntimeError("S3_BUCKET_NAME and AWS_REGION must be set")
-
 _s3_client = None
 
 def get_s3_client():

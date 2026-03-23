@@ -8,9 +8,6 @@ from sqlalchemy.orm import sessionmaker
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set")
-
 # engine = DB 서버와의 연결 풀
 engine = create_engine(
     DATABASE_URL,
