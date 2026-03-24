@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import datetime
 import shutil
 from collections.abc import Callable
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
 from pathlib import Path
 from typing import List, Optional, Tuple
@@ -63,21 +62,15 @@ def build_timeline_prototype(
         cache=cache,
     )
     total = len(ai_input.evidences)
-    _evidence_results: List[Optional[EvidenceProcessingResult]] = [None] * total
+    evidence_results: List[EvidenceProcessingResult] = []
 
-    with ThreadPoolExecutor(max_workers=4) as executor:
-        future_to_idx = {
-            executor.submit(process_one, ev): i for i, ev in enumerate(ai_input.evidences)
-        }
-        completed = 0
-        for future in as_completed(future_to_idx):
-            idx = future_to_idx[future]
-            _evidence_results[idx] = future.result()
-            completed += 1
-            if progress_callback is not None:
-                progress_callback(completed, total)
-
-    evidence_results = [r for r in _evidence_results if r is not None]
+    for i, ev in enumerate(ai_input.evidences):
+        result = process_one(ev)
+        if result is not None:
+            evidence_results.append(result)
+        if progress_callback is not None:
+            progress_callback(i + 1, total)
+            
     items = _assemble_timeline_items(evidence_results)
     return TimelinePrototypeOutput(
         items=items,
