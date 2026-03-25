@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from pathlib import Path
 import shutil
+from collections.abc import Callable
+from functools import partial
+from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
@@ -43,32 +45,39 @@ def build_timeline_prototype(
     ocr_runner=None,
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
         anchor_matcher = AnchorMatcher()
     if validator is None:
         validator = StructuringValidatorV0()
 
+    process_one = partial(
+        process_single_evidence,
+        llm_client=llm_client,
+        anchor_matcher=anchor_matcher,
+        validator=validator,
+        stt_engine=stt_engine,
+        ocr_runner=ocr_runner,
+        cache=cache,
+    )
+    total = len(ai_input.evidences)
     evidence_results: List[EvidenceProcessingResult] = []
 
-    for evidence in ai_input.evidences:
-        result = process_single_evidence(
-            evidence,
-            llm_client=llm_client,
-            anchor_matcher=anchor_matcher,
-            validator=validator,
-            stt_engine=stt_engine,
-            ocr_runner=ocr_runner,
-            cache=cache,
-        )
-        evidence_results.append(result)
-
+    for i, ev in enumerate(ai_input.evidences):
+        result = process_one(ev)
+        if result is not None:
+            evidence_results.append(result)
+        if progress_callback is not None:
+            progress_callback(i + 1, total)
+            
     items = _assemble_timeline_items(evidence_results)
     return TimelinePrototypeOutput(
         items=items,
         model_version=model_version,
         evidence_results=evidence_results,
     )
+
 
 def process_single_evidence(
     evidence: TimelinePrototypeEvidenceInput,
