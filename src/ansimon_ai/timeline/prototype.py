@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 import shutil
 from collections.abc import Callable
 from functools import partial
@@ -11,6 +12,7 @@ from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
+from ansimon_ai.prompting.build_messages import build_victim_image_messages
 from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
@@ -90,12 +92,9 @@ def process_single_evidence(
     cache: Optional[object] = None,
 ) -> EvidenceProcessingResult:
     if evidence.type == "VICTIM":
-        return EvidenceProcessingResult(
-            evidence_id=evidence.evidence_id,
-            type=evidence.type,
-            status="skipped",
-            error_code=UNSUPPORTED_TYPE_ERROR,
-            error_message="VICTIM evidence is not supported in prototype-1.",
+        return _process_victim_evidence(
+            evidence,
+            llm_client=llm_client,
         )
 
     if anchor_matcher is None:
@@ -238,6 +237,62 @@ def _prepare_structuring_input(
         return _prepare_incident_log_from_file(evidence, input_path)
 
     raise NotImplementedError(f"{evidence.type} is not supported in prototype-1.")
+
+def _process_victim_evidence(
+    evidence: TimelinePrototypeEvidenceInput,
+    *,
+    llm_client,
+) -> EvidenceProcessingResult:
+    if evidence.file_format != "IMAGE":
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="skipped",
+            error_code=UNSUPPORTED_FORMAT_ERROR,
+            error_message="VICTIM supports IMAGE only at the moment.",
+        )
+
+    if evidence.file_bytes is None:
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="skipped",
+            error_code=MISSING_INPUT_ERROR,
+            error_message="file_bytes is required for VICTIM IMAGE evidence.",
+        )
+
+    try:
+        messages = build_victim_image_messages(
+            image_bytes=evidence.file_bytes,
+            file_name=evidence.file_name,
+            file_format=evidence.file_format,
+        )
+        structured_data = json.loads(llm_client.generate(messages))
+    except Exception as exc:
+        return EvidenceProcessingResult(
+            evidence_id=evidence.evidence_id,
+            type=evidence.type,
+            status="failed",
+            source_type="vision",
+            error_code=STRUCTURING_ERROR,
+            error_message=str(exc),
+        )
+
+    description = _build_description(evidence, "", structured_data)
+    normalized_text = description or (evidence.file_name or str(evidence.evidence_id))
+
+    return EvidenceProcessingResult(
+        evidence_id=evidence.evidence_id,
+        type=evidence.type,
+        status="completed",
+        source_type="vision",
+        normalized_text=normalized_text,
+        structured_data=structured_data,
+        timestamp=evidence.file_created_at,
+        title=_build_title(evidence, structured_data),
+        description=description,
+        tags=_build_tags(structured_data),
+    )
 
 def _prepare_structuring_input_from_extracted_text(
     evidence: TimelinePrototypeEvidenceInput,
