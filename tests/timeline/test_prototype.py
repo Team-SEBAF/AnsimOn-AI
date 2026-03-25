@@ -116,7 +116,7 @@ def _write_test_file(name: str, content: bytes) -> Path:
     path.write_bytes(content)
     return path
 
-def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
+def test_build_timeline_prototype_completes_incident_log_and_skips_victim_video():
     payload = TimelinePrototypeAiInput(
         complaint_id=uuid4(),
         evidences=[
@@ -134,7 +134,7 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
             TimelinePrototypeEvidenceInput(
                 evidence_id=uuid4(),
                 type="VICTIM",
-                file_format="IMAGE",
+                file_format="VIDEO",
             ),
         ],
     )
@@ -155,7 +155,7 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim():
     assert completed.timestamp.isoformat() == "2026-03-19T21:10:00"
 
     assert skipped.status == "skipped"
-    assert skipped.error_code == "UNSUPPORTED_EVIDENCE_TYPE"
+    assert skipped.error_code == "UNSUPPORTED_FILE_FORMAT"
 
     assert len(result.items) == 1
     assert result.items[0].date == "2026-03-19"
@@ -495,6 +495,41 @@ def test_build_timeline_prototype_processes_docx_report_record():
     assert "consultation record" in evidence_result.normalized_text
     assert result.items[0].date == "2026-03-15"
 
+def test_build_timeline_prototype_processes_victim_image_with_vision_client():
+    image_path = _write_test_file(f"{uuid4()}-victim.jpg", b"fake-image-bytes")
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="VICTIM",
+                file_format="IMAGE",
+                file_name="victim.jpg",
+                file_bytes=image_path.read_bytes(),
+                file_created_at=datetime(2026, 3, 26, 10, 5),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(
+        payload,
+        llm_client=VictimImageLLMClient(),
+    )
+
+    evidence_result = result.evidence_results[0]
+    timeline_evidence = result.items[0].events[0].evidences[0]
+
+    assert evidence_result.status == "completed"
+    assert evidence_result.source_type == "vision"
+    assert evidence_result.title == "팔 부위 멍처럼 보이는 흔적"
+    assert evidence_result.description == "이미지에서 팔 부위에 멍처럼 보이는 변색이 관찰됩니다."
+    assert evidence_result.tags == ["physical"]
+    assert evidence_result.timestamp is not None
+    assert evidence_result.timestamp.isoformat() == "2026-03-26T10:05:00"
+    assert timeline_evidence.title == evidence_result.title
+    assert timeline_evidence.tags == ["physical"]
+
 class TagOnlyLLMClient:
     def generate(self, messages: list[dict]) -> str:
         return json.dumps(
@@ -613,3 +648,108 @@ def test_build_timeline_prototype_prefers_llm_tags():
 
     assert evidence_result.tags == ["repeat", "threat"]
     assert timeline_evidence.tags == ["repeat", "threat"]
+
+class VictimImageLLMClient:
+    def generate(self, messages: list[dict]) -> str:
+        user_message = messages[1]
+        content = user_message["content"]
+        assert isinstance(content, list)
+        assert content[0]["type"] == "text"
+        assert content[1]["type"] == "image_url"
+        assert content[1]["image_url"]["url"].startswith("data:image/")
+
+        return json.dumps(
+            {
+                "evidence_metadata": {
+                    "value": {
+                        "evidence_type": "image",
+                        "source": "unknown",
+                        "sources": ["unknown"],
+                        "created_at": "unknown",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "parties": {
+                    "value": {
+                        "actor": "unknown",
+                        "target": "unknown",
+                        "relationship": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "period": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "frequency": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "channel": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "locations": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "action_types": {
+                    "value": ["approach"],
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "refusal_signal": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "threat_indicators": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "impact_on_victim": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "report_or_record": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "tags": {
+                    "value": ["physical"],
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "timeline_summary": {
+                    "value": {
+                        "title": "팔 부위 멍처럼 보이는 흔적",
+                        "description": "이미지에서 팔 부위에 멍처럼 보이는 변색이 관찰됩니다.",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+            },
+            ensure_ascii=False,
+        )
