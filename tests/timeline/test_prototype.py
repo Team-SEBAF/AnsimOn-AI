@@ -134,7 +134,7 @@ def test_build_timeline_prototype_completes_incident_log_and_skips_victim_video(
             TimelinePrototypeEvidenceInput(
                 evidence_id=uuid4(),
                 type="VICTIM",
-                file_format="VIDEO",
+                file_format="AUDIO",
             ),
         ],
     )
@@ -530,6 +530,61 @@ def test_build_timeline_prototype_processes_victim_image_with_vision_client():
     assert timeline_evidence.title == evidence_result.title
     assert timeline_evidence.tags == ["physical"]
 
+def test_build_timeline_prototype_processes_victim_video_with_vision_client(monkeypatch):
+    video_path = _write_test_file(f"{uuid4()}-victim.mp4", b"fake-video-bytes")
+    frame_one = _write_test_file(f"{uuid4()}-frame1.jpg", b"frame-1")
+    frame_two = _write_test_file(f"{uuid4()}-frame2.jpg", b"frame-2")
+
+    from ansimon_ai.video import ExtractedVideoFrame
+
+    captured: dict[str, object] = {}
+
+    def fake_extract_frames_from_video(*args, **kwargs):
+        captured["interval_seconds"] = kwargs.get("interval_seconds")
+        return [
+            ExtractedVideoFrame(path=frame_one, frame_index=0, frame_timestamp_seconds=0),
+            ExtractedVideoFrame(path=frame_two, frame_index=1, frame_timestamp_seconds=10),
+        ]
+
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.extract_frames_from_video",
+        fake_extract_frames_from_video,
+    )
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="VICTIM",
+                file_format="VIDEO",
+                file_name="victim.mp4",
+                file_bytes=video_path.read_bytes(),
+                file_created_at=datetime(2026, 3, 26, 18, 45),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(
+        payload,
+        llm_client=VictimVideoLLMClient(),
+        victim_video_frame_interval_seconds=5,
+    )
+
+    evidence_result = result.evidence_results[0]
+    timeline_evidence = result.items[0].events[0].evidences[0]
+
+    assert evidence_result.status == "completed"
+    assert evidence_result.source_type == "vision"
+    assert evidence_result.title == "여성에게 가해지는 신체적 접촉"
+    assert evidence_result.description == "남성으로 보이는 인물이 앉아 있는 여성의 머리를 잡는 장면이 관찰되며, 여성이 얼굴을 가리며 방어하는 자세를 취하고 있다."
+    assert evidence_result.tags == ["physical", "refusal"]
+    assert evidence_result.timestamp is not None
+    assert evidence_result.timestamp.isoformat() == "2026-03-26T18:45:00"
+    assert timeline_evidence.title == evidence_result.title
+    assert timeline_evidence.tags == ["physical", "refusal"]
+    assert captured["interval_seconds"] == 5
+
 class TagOnlyLLMClient:
     def generate(self, messages: list[dict]) -> str:
         return json.dumps(
@@ -745,6 +800,112 @@ class VictimImageLLMClient:
                     "value": {
                         "title": "팔 부위 멍처럼 보이는 흔적",
                         "description": "이미지에서 팔 부위에 멍처럼 보이는 변색이 관찰됩니다.",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+            },
+            ensure_ascii=False,
+        )
+
+class VictimVideoLLMClient:
+    def generate(self, messages: list[dict]) -> str:
+        user_message = messages[1]
+        content = user_message["content"]
+        assert isinstance(content, list)
+        assert content[0]["type"] == "text"
+        image_parts = [item for item in content if item["type"] == "image_url"]
+        assert len(image_parts) == 2
+        assert all(part["image_url"]["url"].startswith("data:image/") for part in image_parts)
+
+        return json.dumps(
+            {
+                "evidence_metadata": {
+                    "value": {
+                        "evidence_type": "video",
+                        "source": "unknown",
+                        "sources": ["unknown"],
+                        "created_at": "unknown",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "parties": {
+                    "value": {
+                        "actor": "unknown",
+                        "target": "unknown",
+                        "relationship": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "period": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "frequency": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "channel": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "locations": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "action_types": {
+                    "value": ["restraint"],
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "refusal_signal": {
+                    "value": "nonverbal",
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "threat_indicators": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "impact_on_victim": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "report_or_record": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "tags": {
+                    "value": ["physical", "refusal"],
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "timeline_summary": {
+                    "value": {
+                        "title": "여성에게 가해지는 신체적 접촉",
+                        "description": "남성으로 보이는 인물이 앉아 있는 여성의 머리를 잡는 장면이 관찰되며, 여성이 얼굴을 가리며 방어하는 자세를 취하고 있다.",
                     },
                     "confidence": "medium",
                     "evidence_span": None,
