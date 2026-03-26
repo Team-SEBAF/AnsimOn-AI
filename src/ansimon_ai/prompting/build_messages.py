@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 
 from ansimon_ai.structuring.types import StructuringInput
+from ansimon_ai.video import ExtractedVideoFrame
 
 PROMPT_PATH = Path(__file__).parent / "system_prompt_v0.txt"
 
@@ -76,6 +77,65 @@ def build_victim_image_messages(
                     },
                 },
             ],
+        },
+    ]
+
+def build_victim_video_messages(
+    *,
+    frames: list[ExtractedVideoFrame],
+    file_name: str | None = None,
+) -> list[dict]:
+    content: list[dict] = [
+        {
+            "type": "text",
+            "text": "\n".join(
+                [
+                    "Analyze these frames from the same victim evidence video and return a single JSON object that follows the required schema.",
+                    "All images come from one video evidence, so produce one combined result for the whole video.",
+                    "Focus only on what is visually observable across the frames.",
+                    "Do not make medical, legal, or factual conclusions beyond the video frames themselves.",
+                    "If something is unclear, use cautious language and lower confidence.",
+                    "Assign the `physical` tag only when bodily injury marks, bruising, bleeding, restraint, or strong physical force are comparatively clear in the frames.",
+                    "Do not assign the `physical` tag for simple touch or ambiguous contact alone.",
+                    "Assign the `sexual_insult` tag only when sexual exposure, sexual humiliation, or unwanted sexual contact is comparatively clear in the frames.",
+                    "Do not assign the `sexual_insult` tag when the sexual context is unclear or inferred only from pose or proximity.",
+                    "Because this is a video-frame input, evidence_span and evidence_anchor may be null when no reliable text span exists.",
+                    *( [f"File name: {file_name}"] if file_name else [] ),
+                ]
+            ),
+        }
+    ]
+
+    for frame in frames:
+        content.append(
+            {
+                "type": "text",
+                "text": f"Frame at {frame.frame_timestamp_seconds} seconds",
+            }
+        )
+        content.append(
+            {
+                "type": "image_url",
+                "image_url": {
+                    "url": _build_image_data_url(
+                        image_bytes=frame.path.read_bytes(),
+                        mime_type=_infer_image_mime_type(
+                            file_name=frame.path.name,
+                            file_format="IMAGE",
+                        ),
+                    ),
+                },
+            }
+        )
+
+    return [
+        {
+            "role": "system",
+            "content": load_system_prompt(),
+        },
+        {
+            "role": "user",
+            "content": content,
         },
     ]
 

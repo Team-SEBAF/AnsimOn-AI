@@ -12,10 +12,14 @@ from ansimon_ai.eval.validator_adapter_v0 import StructuringValidatorV0
 from ansimon_ai.structuring.anchor.matcher import AnchorMatcher
 from ansimon_ai.structuring.from_stt import build_structuring_input_from_stt
 from ansimon_ai.structuring.from_text import build_structuring_input_from_text
-from ansimon_ai.prompting.build_messages import build_victim_image_messages
+from ansimon_ai.prompting.build_messages import (
+    build_victim_image_messages,
+    build_victim_video_messages,
+)
 from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
+from ansimon_ai.video import extract_frames_from_video
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
 from .types import (
@@ -48,6 +52,7 @@ def build_timeline_prototype(
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
     progress_callback: Optional[Callable[[int, int], None]] = None,
+    victim_video_frame_interval_seconds: int = 10,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
         anchor_matcher = AnchorMatcher()
@@ -62,6 +67,7 @@ def build_timeline_prototype(
         stt_engine=stt_engine,
         ocr_runner=ocr_runner,
         cache=cache,
+        victim_video_frame_interval_seconds=victim_video_frame_interval_seconds,
     )
     total = len(ai_input.evidences)
     evidence_results: List[EvidenceProcessingResult] = []
@@ -90,11 +96,13 @@ def process_single_evidence(
     stt_engine=None,
     ocr_runner=None,
     cache: Optional[object] = None,
+    victim_video_frame_interval_seconds: int = 10,
 ) -> EvidenceProcessingResult:
     if evidence.type == "VICTIM":
         return _process_victim_evidence(
             evidence,
             llm_client=llm_client,
+            frame_interval_seconds=victim_video_frame_interval_seconds,
         )
 
     if anchor_matcher is None:
@@ -242,14 +250,15 @@ def _process_victim_evidence(
     evidence: TimelinePrototypeEvidenceInput,
     *,
     llm_client,
+    frame_interval_seconds: int = 10,
 ) -> EvidenceProcessingResult:
-    if evidence.file_format != "IMAGE":
+    if evidence.file_format not in {"IMAGE", "VIDEO"}:
         return EvidenceProcessingResult(
             evidence_id=evidence.evidence_id,
             type=evidence.type,
             status="skipped",
             error_code=UNSUPPORTED_FORMAT_ERROR,
-            error_message="VICTIM supports IMAGE only at the moment.",
+            error_message="VICTIM supports IMAGE or VIDEO only at the moment.",
         )
 
     if evidence.file_bytes is None:
@@ -261,12 +270,27 @@ def _process_victim_evidence(
             error_message="file_bytes is required for VICTIM IMAGE evidence.",
         )
 
+    temp_dir = _create_runtime_temp_dir(evidence)
     try:
-        messages = build_victim_image_messages(
-            image_bytes=evidence.file_bytes,
-            file_name=evidence.file_name,
-            file_format=evidence.file_format,
-        )
+        if evidence.file_format == "IMAGE":
+            messages = build_victim_image_messages(
+                image_bytes=evidence.file_bytes,
+                file_name=evidence.file_name,
+                file_format=evidence.file_format,
+            )
+        else:
+            input_path = _materialize_input_file(evidence, temp_dir=temp_dir)
+            frames_dir = temp_dir / "frames"
+            frames = extract_frames_from_video(
+                input_path,
+                output_dir=frames_dir,
+                interval_seconds=frame_interval_seconds,
+            )
+            messages = build_victim_video_messages(
+                frames=frames,
+                file_name=evidence.file_name,
+            )
+
         structured_data = json.loads(llm_client.generate(messages))
     except Exception as exc:
         return EvidenceProcessingResult(
@@ -277,6 +301,11 @@ def _process_victim_evidence(
             error_code=STRUCTURING_ERROR,
             error_message=str(exc),
         )
+    finally:
+        try:
+            shutil.rmtree(temp_dir)
+        except OSError:
+            pass
 
     description = _build_description(evidence, "", structured_data)
     normalized_text = description or (evidence.file_name or str(evidence.evidence_id))
