@@ -52,7 +52,7 @@ def build_timeline_prototype(
     cache: Optional[object] = None,
     model_version: str = DEFAULT_MODEL_VERSION,
     progress_callback: Optional[Callable[[int, int], None]] = None,
-    victim_video_frame_interval_seconds: int = 10,
+    victim_video_frame_interval_seconds: int = 3,
 ) -> TimelinePrototypeOutput:
     if anchor_matcher is None:
         anchor_matcher = AnchorMatcher()
@@ -96,7 +96,7 @@ def process_single_evidence(
     stt_engine=None,
     ocr_runner=None,
     cache: Optional[object] = None,
-    victim_video_frame_interval_seconds: int = 10,
+    victim_video_frame_interval_seconds: int = 3,
 ) -> EvidenceProcessingResult:
     if evidence.type == "VICTIM":
         return _process_victim_evidence(
