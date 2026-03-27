@@ -86,7 +86,6 @@ def build_timeline_prototype(
         evidence_results=evidence_results,
     )
 
-
 def process_single_evidence(
     evidence: TimelinePrototypeEvidenceInput,
     *,
