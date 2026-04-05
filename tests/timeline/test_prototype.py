@@ -539,6 +539,9 @@ def test_build_timeline_prototype_processes_victim_video_with_vision_client(monk
 
     captured: dict[str, object] = {}
 
+    def fake_get_video_duration_seconds(_input_path: str) -> float:
+        return 45.0
+
     def fake_extract_frames_from_video(*args, **kwargs):
         captured["interval_seconds"] = kwargs.get("interval_seconds")
         return [
@@ -546,6 +549,10 @@ def test_build_timeline_prototype_processes_victim_video_with_vision_client(monk
             ExtractedVideoFrame(path=frame_two, frame_index=1, frame_timestamp_seconds=10),
         ]
 
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.get_video_duration_seconds",
+        fake_get_video_duration_seconds,
+    )
     monkeypatch.setattr(
         "ansimon_ai.timeline.prototype.extract_frames_from_video",
         fake_extract_frames_from_video,
@@ -584,6 +591,58 @@ def test_build_timeline_prototype_processes_victim_video_with_vision_client(monk
     assert timeline_evidence.title == evidence_result.title
     assert timeline_evidence.tags == ["physical", "refusal"]
     assert captured["interval_seconds"] == 5
+
+def test_build_timeline_prototype_uses_one_second_interval_for_short_victim_video(monkeypatch):
+    video_path = _write_test_file(f"{uuid4()}-short-victim.mp4", b"fake-video-bytes")
+    frame_one = _write_test_file(f"{uuid4()}-short-frame1.jpg", b"frame-1")
+    frame_two = _write_test_file(f"{uuid4()}-short-frame2.jpg", b"frame-2")
+
+    from ansimon_ai.video import ExtractedVideoFrame
+
+    captured: dict[str, object] = {}
+
+    def fake_get_video_duration_seconds(_input_path: str) -> float:
+        return 18.0
+
+    def fake_extract_frames_from_video(*args, **kwargs):
+        captured["interval_seconds"] = kwargs.get("interval_seconds")
+        return [
+            ExtractedVideoFrame(path=frame_one, frame_index=0, frame_timestamp_seconds=0),
+            ExtractedVideoFrame(path=frame_two, frame_index=1, frame_timestamp_seconds=1),
+        ]
+
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.get_video_duration_seconds",
+        fake_get_video_duration_seconds,
+    )
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.extract_frames_from_video",
+        fake_extract_frames_from_video,
+    )
+
+    payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="VICTIM",
+                file_format="VIDEO",
+                file_name="short-victim.mp4",
+                file_bytes=video_path.read_bytes(),
+            ),
+        ],
+    )
+
+    result = build_timeline_prototype(
+        payload,
+        llm_client=VictimVideoLLMClient(),
+        victim_video_frame_interval_seconds=3,
+    )
+
+    evidence_result = result.evidence_results[0]
+
+    assert evidence_result.status == "completed"
+    assert captured["interval_seconds"] == 1
 
 class TagOnlyLLMClient:
     def generate(self, messages: list[dict]) -> str:

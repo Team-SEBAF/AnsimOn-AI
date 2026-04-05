@@ -3,7 +3,7 @@ import subprocess
 
 import pytest
 
-from ansimon_ai.video import extract_frames_from_video
+from ansimon_ai.video import extract_frames_from_video, get_video_duration_seconds
 
 def test_extract_frames_from_video_runs_ffmpeg_and_returns_frame_metadata(
     monkeypatch: pytest.MonkeyPatch,
@@ -81,3 +81,43 @@ def test_extract_frames_from_video_raises_when_no_frames_are_created(
             output_dir=tmp_path / "frames",
             interval_seconds=5,
         )
+
+def test_get_video_duration_seconds_parses_ffprobe_output(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    video_path = tmp_path / "sample.mp4"
+    video_path.write_bytes(b"fake-video")
+
+    recorded: dict[str, object] = {}
+
+    def fake_run(command, check, capture_output, text):
+        recorded["command"] = command
+        recorded["check"] = check
+        recorded["capture_output"] = capture_output
+        recorded["text"] = text
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            '{"format":{"duration":"12.345"}}',
+            "",
+        )
+
+    monkeypatch.setattr("ansimon_ai.video.extract_frames.subprocess.run", fake_run)
+
+    duration = get_video_duration_seconds(video_path)
+
+    assert recorded["command"] == [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-of",
+        "json",
+        str(video_path),
+    ]
+    assert recorded["check"] is True
+    assert recorded["capture_output"] is True
+    assert recorded["text"] is True
+    assert duration == 12.345
