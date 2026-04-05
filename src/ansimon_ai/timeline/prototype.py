@@ -19,7 +19,7 @@ from ansimon_ai.prompting.build_messages import (
 from ansimon_ai.structuring.run import run_structuring_pipeline
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 from ansimon_ai.structuring.types import StructuringInput
-from ansimon_ai.video import extract_frames_from_video
+from ansimon_ai.video import extract_frames_from_video, get_video_duration_seconds
 
 from .grouping import bucket_evidences_by_date_time, build_timeline_event_evidences
 from .types import (
@@ -249,7 +249,7 @@ def _process_victim_evidence(
     evidence: TimelinePrototypeEvidenceInput,
     *,
     llm_client,
-    frame_interval_seconds: int = 10,
+    frame_interval_seconds: int = 3,
 ) -> EvidenceProcessingResult:
     if evidence.file_format not in {"IMAGE", "VIDEO"}:
         return EvidenceProcessingResult(
@@ -280,10 +280,14 @@ def _process_victim_evidence(
         else:
             input_path = _materialize_input_file(evidence, temp_dir=temp_dir)
             frames_dir = temp_dir / "frames"
+            resolved_frame_interval_seconds = _resolve_victim_video_frame_interval_seconds(
+                input_path,
+                default_interval_seconds=frame_interval_seconds,
+            )
             frames = extract_frames_from_video(
                 input_path,
                 output_dir=frames_dir,
-                interval_seconds=frame_interval_seconds,
+                interval_seconds=resolved_frame_interval_seconds,
             )
             messages = build_victim_video_messages(
                 frames=frames,
@@ -445,6 +449,20 @@ def _build_document_structuring_input(text: str) -> StructuringInput:
     if not lines:
         lines = [text]
     return build_structuring_input_from_document(lines)
+
+def _resolve_victim_video_frame_interval_seconds(
+    input_path: str,
+    *,
+    default_interval_seconds: int,
+) -> int:
+    try:
+        duration_seconds = get_video_duration_seconds(input_path)
+    except Exception:
+        return default_interval_seconds
+
+    if duration_seconds <= 20:
+        return 1
+    return default_interval_seconds
 
 def _run_ocr(image_path: str, *, ocr_runner=None):
     if ocr_runner is not None:
