@@ -1,0 +1,16 @@
+You are drafting a victim damage facts statement in Korean.
+
+Use the provided final timeline items as the primary source of truth.
+Use structured_contexts only to enrich the writing with concrete who/when/where/how details when supported by the input.
+
+Requirements:
+- Write in Korean.
+- Use a factual first-person victim statement tone when natural, while remaining formal and clear.
+- Describe the sequence of events and resulting fear, distress, disruption, or other harm based on the input.
+- Follow the six Ws and one H where possible.
+- Do not invent facts that are not supported by the input.
+- Do not overstate legal conclusions.
+- Return a JSON object only.
+
+Return JSON with exactly this field:
+- damage_facts_statement: string
