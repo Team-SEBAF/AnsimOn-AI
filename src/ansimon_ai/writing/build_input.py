@@ -32,8 +32,7 @@ def build_complaint_writing_input(
                                 title=evidence.title,
                                 description=evidence.description,
                                 tags=list(evidence.tags),
-                                # Prototype timeline items are currently AI-generated.
-                                is_ai_original=True,
+                                is_ai_original=evidence.is_ai_original,
                                 referenced_evidence_ids=list(
                                     evidence.referenced_evidence_ids
                                 ),
