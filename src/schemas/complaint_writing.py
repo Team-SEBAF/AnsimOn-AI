@@ -42,9 +42,7 @@ class ComplaintWritingStructuredContext(BaseModel):
 class ComplaintWritingAiInput(BaseModel):
     complaint_id: UUID
     items: List[ComplaintWritingDateItem]
-    structured_contexts: List[ComplaintWritingStructuredContext] = Field(
-        default_factory=list
-    )
+    structured_contexts: Optional[List[ComplaintWritingStructuredContext]] = None
 
 class ComplaintDocumentOutput(BaseModel):
     section_4_crime_facts: str
