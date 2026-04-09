@@ -973,3 +973,367 @@ class VictimVideoLLMClient:
             },
             ensure_ascii=False,
         )
+
+class CountingLLMClient:
+    def __init__(self) -> None:
+        self.call_count = 0
+
+    def generate(self, messages: list[dict]) -> str:
+        self.call_count += 1
+        return json.dumps(
+            {
+                "evidence_metadata": {
+                    "value": {
+                        "evidence_type": "text",
+                        "source": "unknown",
+                        "sources": ["unknown"],
+                        "created_at": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "parties": {
+                    "value": {
+                        "actor": "unknown",
+                        "target": "unknown",
+                        "relationship": "unknown",
+                    },
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "period": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "frequency": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "channel": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "locations": {
+                    "value": ["unknown"],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "action_types": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "refusal_signal": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "threat_indicators": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "impact_on_victim": {
+                    "value": [],
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "report_or_record": {
+                    "value": "unknown",
+                    "confidence": "low",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+                "timeline_summary": {
+                    "value": {
+                        "title": "cache test title",
+                        "description": "cache test description",
+                    },
+                    "confidence": "medium",
+                    "evidence_span": None,
+                    "evidence_anchor": None,
+                },
+            },
+            ensure_ascii=False,
+        )
+
+class InMemoryCache:
+    def __init__(self) -> None:
+        self._store: dict[str, dict] = {}
+
+    def get(self, key: str):
+        return self._store.get(key)
+
+    def set(self, key: str, value: dict) -> None:
+        self._store[key] = value
+
+def test_build_timeline_prototype_reuses_cached_results_for_existing_evidence(monkeypatch):
+    monkeypatch.setattr(
+        "ansimon_ai.structuring.run.compute_input_hash",
+        lambda input, schema_version, prompt_version: input.full_text,
+    )
+
+    llm_client = CountingLLMClient()
+    cache = InMemoryCache()
+
+    evidence_a = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="REPORT_RECORD",
+        file_format="TXT",
+        extracted_text="2026-03-19 repeated threatening messages were documented.",
+    )
+    evidence_b = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="REPORT_RECORD",
+        file_format="TXT",
+        extracted_text="2026-03-20 the actor appeared near the victim's workplace.",
+    )
+
+    first_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a],
+    )
+    first_result = build_timeline_prototype(
+        first_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+
+    second_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a, evidence_b],
+    )
+    second_result = build_timeline_prototype(
+        second_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+
+    assert len(first_result.evidence_results) == 1
+    assert len(second_result.evidence_results) == 2
+    assert llm_client.call_count == 2
+    assert second_result.evidence_results[0].title == "cache test title"
+    assert second_result.evidence_results[1].title == "cache test title"
+
+@pytest.mark.parametrize(
+    ("evidence_type", "file_format", "builder_key"),
+    [
+        ("REPORT_RECORD", "TXT", "report_record"),
+        ("INCIDENT_LOG", None, "incident_log_form"),
+        ("MESSAGE", "IMAGE", "message_image"),
+        ("VOICE", "AUDIO", "voice_audio"),
+    ],
+)
+def test_build_timeline_prototype_reuses_cached_results_by_type(
+    monkeypatch,
+    evidence_type: str,
+    file_format: str | None,
+    builder_key: str,
+):
+    monkeypatch.setattr(
+        "ansimon_ai.structuring.run.compute_input_hash",
+        lambda input, schema_version, prompt_version: input.full_text,
+    )
+
+    llm_client = CountingLLMClient()
+    cache = InMemoryCache()
+
+    def fake_ocr_runner(_image_path: str) -> OCRResult:
+        full_text = f"2026-03-17 18:30 repeated threatening message {_image_path}"
+        return OCRResult(
+            full_text=full_text,
+            segments=[
+                OCRSegment(
+                    text=full_text,
+                )
+            ],
+            language="ko",
+            engine="fake-ocr",
+        )
+
+    builders = {
+        "report_record": lambda text: TimelinePrototypeEvidenceInput(
+            evidence_id=uuid4(),
+            type="REPORT_RECORD",
+            file_format="TXT",
+            extracted_text=text,
+        ),
+        "incident_log_form": lambda text: TimelinePrototypeEvidenceInput(
+            evidence_id=uuid4(),
+            type="INCIDENT_LOG",
+            incident_log_form=IncidentLogFormInput(
+                title=text,
+                date="2026-03-19",
+                time="21:10",
+                place="home",
+                situation=text,
+            ),
+        ),
+        "message_image": lambda text: TimelinePrototypeEvidenceInput(
+            evidence_id=uuid4(),
+            type="MESSAGE",
+            file_format="IMAGE",
+            file_name="message.png",
+            file_bytes=b"fake-image",
+        ),
+        "voice_audio": lambda text: TimelinePrototypeEvidenceInput(
+            evidence_id=uuid4(),
+            type="VOICE",
+            file_format="AUDIO",
+            file_name="voice.m4a",
+            file_bytes=b"fake-audio",
+        ),
+    }
+
+    evidence_a = builders[builder_key]("first evidence")
+    evidence_b = builders[builder_key]("second evidence")
+
+    first_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a],
+    )
+    build_kwargs = {
+        "llm_client": llm_client,
+        "cache": cache,
+    }
+    if builder_key == "message_image":
+        build_kwargs["ocr_runner"] = fake_ocr_runner
+    if builder_key == "voice_audio":
+        build_kwargs["stt_engine"] = MockSTT()
+
+    build_timeline_prototype(first_payload, **build_kwargs)
+    first_request_count = llm_client.call_count
+
+    second_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a, evidence_b],
+    )
+    build_timeline_prototype(second_payload, **build_kwargs)
+    added_requests_on_second_run = llm_client.call_count - first_request_count
+
+    assert first_request_count == 1
+    assert added_requests_on_second_run == 1
+
+def test_build_timeline_prototype_reuses_cached_results_for_victim_image():
+    llm_client = CountingLLMClient()
+    cache = InMemoryCache()
+
+    evidence_a = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VICTIM",
+        file_format="IMAGE",
+        file_name="victim-a.jpg",
+        file_bytes=b"fake-image-a",
+    )
+    evidence_b = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VICTIM",
+        file_format="IMAGE",
+        file_name="victim-b.jpg",
+        file_bytes=b"fake-image-b",
+    )
+
+    first_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a],
+    )
+    build_timeline_prototype(
+        first_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+    first_request_count = llm_client.call_count
+
+    second_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a, evidence_b],
+    )
+    build_timeline_prototype(
+        second_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+    added_requests_on_second_run = llm_client.call_count - first_request_count
+
+    assert first_request_count == 1
+    assert added_requests_on_second_run == 1
+
+def test_build_timeline_prototype_reuses_cached_results_for_victim_video(monkeypatch):
+    llm_client = CountingLLMClient()
+    cache = InMemoryCache()
+
+    frame_one = _write_test_file(f"{uuid4()}-cache-frame1.jpg", b"frame-1")
+    frame_two = _write_test_file(f"{uuid4()}-cache-frame2.jpg", b"frame-2")
+
+    from ansimon_ai.video import ExtractedVideoFrame
+
+    def fake_get_video_duration_seconds(_input_path: str) -> float:
+        return 45.0
+
+    def fake_extract_frames_from_video(*args, **kwargs):
+        return [
+            ExtractedVideoFrame(path=frame_one, frame_index=0, frame_timestamp_seconds=0),
+            ExtractedVideoFrame(path=frame_two, frame_index=1, frame_timestamp_seconds=10),
+        ]
+
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.get_video_duration_seconds",
+        fake_get_video_duration_seconds,
+    )
+    monkeypatch.setattr(
+        "ansimon_ai.timeline.prototype.extract_frames_from_video",
+        fake_extract_frames_from_video,
+    )
+
+    evidence_a = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VICTIM",
+        file_format="VIDEO",
+        file_name="victim-a.mp4",
+        file_bytes=b"fake-video-a",
+    )
+    evidence_b = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VICTIM",
+        file_format="VIDEO",
+        file_name="victim-b.mp4",
+        file_bytes=b"fake-video-b",
+    )
+
+    first_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a],
+    )
+    build_timeline_prototype(
+        first_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+    first_request_count = llm_client.call_count
+
+    second_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[evidence_a, evidence_b],
+    )
+    build_timeline_prototype(
+        second_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+    added_requests_on_second_run = llm_client.call_count - first_request_count
+
+    assert first_request_count == 1
+    assert added_requests_on_second_run == 1
