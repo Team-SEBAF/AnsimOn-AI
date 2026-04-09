@@ -1,16 +1,17 @@
 import json
 from uuid import uuid4
 
+from ansimon_ai.llm.mock import MockLLMClient
+from ansimon_ai.writing.generate import (
+    generate_complaint_document,
+    generate_damage_facts_statement,
+)
 from schemas.complaint_writing import (
     ComplaintWritingAiInput,
     ComplaintWritingDateItem,
     ComplaintWritingEvent,
     ComplaintWritingStructuredContext,
     ComplaintWritingTimelineItem,
-)
-from ansimon_ai.writing.generate import (
-    generate_complaint_document,
-    generate_damage_facts_statement,
 )
 
 class DummyLLMClient:
@@ -48,7 +49,7 @@ def _make_ai_input() -> ComplaintWritingAiInput:
             ComplaintWritingStructuredContext(
                 evidence_id=uuid4(),
                 channel=["offline"],
-                locations=["주차장"],
+                locations=["주거지"],
                 action_types=["접근", "폭행"],
                 impact_on_victim=["불안", "공포"],
             )
@@ -84,3 +85,15 @@ def test_generate_damage_facts_statement_returns_valid_output() -> None:
 
     assert result.damage_facts_statement == "피해 사실 진술 본문"
     assert llm_client.last_messages is not None
+
+def test_generate_document_outputs_with_mock_llm_client() -> None:
+    ai_input = _make_ai_input()
+    llm_client = MockLLMClient()
+
+    complaint_result = generate_complaint_document(ai_input, llm_client=llm_client)
+    statement_result = generate_damage_facts_statement(ai_input, llm_client=llm_client)
+
+    assert complaint_result.section_4_crime_facts
+    assert complaint_result.section_5_complaint_reason
+    assert complaint_result.section_6_evidence_list_text
+    assert statement_result.damage_facts_statement
