@@ -1,10 +1,17 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import NAMESPACE_URL, uuid5
+from zoneinfo import ZoneInfo
 
 def _to_date_time_str(ts: Optional[datetime]) -> Tuple[str, str]:
     if ts is None:
         return "UNKNOWN", "00:00"
+    
+    if ts.tzinfo is None:
+        ts = ts.replace(tzinfo=ZoneInfo("Asia/Seoul"))
+    else:
+        ts = ts.astimezone(ZoneInfo("Asia/Seoul"))
+        
     return ts.strftime("%Y-%m-%d"), ts.strftime("%H:%M")
 
 def _message_group_key(evidence: Dict[str, Any]) -> str:
