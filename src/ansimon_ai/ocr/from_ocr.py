@@ -9,13 +9,38 @@ from .types import OCRSegment
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
 
+_UI_EDGE_CHARS = "<>=_+-@…·|~ "
+_UI_ONLY_VALUES = {"글", "메시지 입력", "message"}
+
+def _clean_ocr_text(text: str) -> str:
+    text = " ".join(text.replace("\n", " ").replace("\r", " ").split())
+    text = text.strip()
+    if not text:
+        return ""
+
+    if all(c in "!@#$%^&*()_+=[]{}|;:'\",.<>?/\\-~…· " for c in text):
+        return ""
+
+    text = text.strip(_UI_EDGE_CHARS)
+    if not text:
+        return ""
+
+    parts = text.split()
+    while len(parts) > 1 and parts[-1] == "Q":
+        parts.pop()
+    text = " ".join(parts).strip(_UI_EDGE_CHARS)
+
+    if text.lower() in _UI_ONLY_VALUES:
+        return ""
+
+    return text
+
 def preprocess_ocr_segments(segments):
     processed = []
     for seg in segments:
-        text = seg.text.strip()
-        if not text or all(c in "!@#$%^&*()_+=[]{}|;:'\",.<>?/\\ " for c in text):
+        text = _clean_ocr_text(seg.text)
+        if not text:
             continue
-        text = " ".join(text.replace("\n", " ").replace("\r", " ").split())
         start = seg.start if seg.start is not None else 0.0
         end = seg.end if seg.end is not None else 0.0
         processed.append({**seg.model_dump(), "text": text, "start": start, "end": end})
@@ -26,11 +51,12 @@ def build_structuring_input_from_ocr(
     metadata_fallback_timestamp: Optional[datetime] = None,
 ) -> StructuringInput:
     segments = preprocess_ocr_segments(ocr.segments)
+    full_text = "\n".join(seg.get("text", "") for seg in segments).strip()
     return StructuringInput(
         modality="text",
         source_type="ocr",
         language=ocr.language,
-        full_text=ocr.full_text,
+        full_text=full_text or ocr.full_text,
         segments=[
             StructuringSegment(
                 text=seg.get("text", ""),
