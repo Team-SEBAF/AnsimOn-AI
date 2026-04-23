@@ -62,13 +62,21 @@ def preprocess_ocr_segments(segments):
 
 def _merge_time_segments(segments):
     merged = []
+    pending_time_text = None
     for seg in segments:
         raw_text = seg.get("raw_text") or seg.get("text", "")
         if _is_time_only_text(raw_text):
             target = _find_time_attachment_target(merged)
             if target is not None:
                 target["text"] = f'{target["text"]} [시각: {raw_text}]'
+            else:
+                pending_time_text = raw_text
             continue
+
+        if pending_time_text and not _is_date_only_text(raw_text):
+            seg["text"] = f'{seg["text"]} [시각: {pending_time_text}]'
+            pending_time_text = None
+
         merged.append(seg)
     return merged
 
