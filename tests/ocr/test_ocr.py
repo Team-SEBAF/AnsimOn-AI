@@ -55,6 +55,43 @@ def test_build_structuring_input_from_ocr_cleans_chat_ui_noise():
     assert "가해자" in struct_input.full_text
     assert "불 켜져 있는 것 같은데" in struct_input.full_text
 
+def test_build_structuring_input_from_ocr_applies_speaker_prefix():
+    segments = [
+        OCRSegment(
+            text="안녕하세요",
+            line=1,
+            speaker_side="left",
+        ),
+        OCRSegment(
+            text="무슨 일이세요?",
+            line=2,
+            speaker_side="right",
+        ),
+    ]
+    full_text = "\n".join(segment.text for segment in segments)
+
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+
+    assert "[상대방] 안녕하세요" in struct_input.full_text
+    assert "[피해자] 무슨 일이세요?" in struct_input.full_text
+
+def test_build_structuring_input_from_ocr_attaches_time_to_previous_message():
+    segments = [
+        OCRSegment(text="2025년 4월 15일", line=1),
+        OCRSegment(text="첫 번째 메시지", line=2, speaker_side="left"),
+        OCRSegment(text="오후 10:54", line=3, speaker_side="left"),
+        OCRSegment(text="그만해라 진짜", line=4, speaker_side="right"),
+        OCRSegment(text="오후 11:42", line=5, speaker_side="right"),
+    ]
+    full_text = "\n".join(segment.text for segment in segments)
+
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+
+    assert len(struct_input.segments) == 3
+    assert "[시각: 오후 10:54]" in struct_input.full_text
+    assert "[시각: 오후 11:42]" in struct_input.full_text
+    assert sum(1 for segment in struct_input.segments if "[시각:" in segment.text) == 2
+
 def test_medical_record():
     segments = [
         OCRSegment(text="진단명: 외상성 스트레스 장애", page=1, line=1),
