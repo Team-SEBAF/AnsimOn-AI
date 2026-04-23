@@ -35,6 +35,26 @@ def test_missed_calls():
     assert len(struct_input.segments) == 3
     assert "부재중" in struct_input.full_text
 
+def test_build_structuring_input_from_ocr_cleans_chat_ui_noise():
+    segments = [
+        OCRSegment(text="< 가해자 Q ="),
+        OCRSegment(text="2026 년 3 월 10 일 화요일 >"),
+        OCRSegment(text="+ - 글"),
+        OCRSegment(text="@…"),
+        OCRSegment(text="불 켜져 있는 것 같은데"),
+    ]
+    full_text = "\n".join(segment.text for segment in segments)
+
+    struct_input = build_structuring_input_from_ocr(make_ocr_result(segments, full_text))
+
+    assert "가해자 Q" not in struct_input.full_text
+    assert "<" not in struct_input.full_text
+    assert "=" not in struct_input.full_text
+    assert "+ - 글" not in struct_input.full_text
+    assert "@…" not in struct_input.full_text
+    assert "가해자" in struct_input.full_text
+    assert "불 켜져 있는 것 같은데" in struct_input.full_text
+
 def test_medical_record():
     segments = [
         OCRSegment(text="진단명: 외상성 스트레스 장애", page=1, line=1),
