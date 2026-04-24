@@ -6,6 +6,7 @@ from zipfile import ZipFile
 from PIL import Image, UnidentifiedImageError
 
 from ansimon_ai.ocr.from_ocr import ocr_image_to_result
+from ansimon_ai.ocr.table_formatting import format_ocr_result_text
 
 def _normalize_line(text: str) -> str:
     text = text.replace("\r", " ").replace("\n", " ")
@@ -55,8 +56,9 @@ def _extract_text_from_docx_images(
             except (UnidentifiedImageError, OSError):
                 continue
 
-            if result.full_text.strip():
-                _append_normalized_lines(image_texts, result.full_text)
+            formatted_text = format_ocr_result_text(result)
+            if formatted_text.strip():
+                _append_normalized_lines(image_texts, formatted_text)
 
     return image_texts
 

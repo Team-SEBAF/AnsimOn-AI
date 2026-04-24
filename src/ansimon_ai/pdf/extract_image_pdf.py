@@ -2,6 +2,7 @@ from typing import List, Optional
 from pdf2image import convert_from_path
 
 from ansimon_ai.ocr.from_ocr import ocr_image_to_result
+from ansimon_ai.ocr.table_formatting import format_ocr_result_text
 
 def extract_text_from_image_pdf(
     pdf_path: str,
@@ -12,7 +13,7 @@ def extract_text_from_image_pdf(
     texts = []
     for img in images:
         result = ocr_image_to_result(img, engine=engine, lang=lang)
-        texts.append(result.full_text)
+        texts.append(format_ocr_result_text(result))
     return texts
 
 def extract_text_from_image_pdf_page(
@@ -29,4 +30,4 @@ def extract_text_from_image_pdf_page(
     if not images:
         return ""
     result = ocr_image_to_result(images[0], engine=engine, lang=lang)
-    return result.full_text
+    return format_ocr_result_text(result)

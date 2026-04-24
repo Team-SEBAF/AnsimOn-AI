@@ -9,6 +9,7 @@ from PIL import Image as PILImage
 from .types import OCRResult
 from .types import OCRSegment
 from .clova_ocr import clova_ocr_image_to_result
+from .table_formatting import format_ocr_result_text, is_tabular_table
 
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
 from ansimon_ai.structuring.timestamp_utils import extract_timestamp
@@ -111,7 +112,7 @@ def build_structuring_input_from_ocr(
     metadata_fallback_timestamp: Optional[datetime] = None,
 ) -> StructuringInput:
     segments = preprocess_ocr_segments(ocr.segments)
-    full_text = "\n".join(seg.get("text", "") for seg in segments).strip()
+    full_text = _build_ocr_full_text(ocr, segments)
     return StructuringInput(
         modality="text",
         source_type="ocr",
@@ -130,6 +131,15 @@ def build_structuring_input_from_ocr(
             for seg in segments
         ],
     )
+
+def _build_ocr_full_text(ocr: OCRResult, segments: list[dict]) -> str:
+    if any(is_tabular_table(table) for table in ocr.tables):
+        formatted_text = format_ocr_result_text(ocr).strip()
+        if formatted_text:
+            return formatted_text
+
+    processed_text = "\n".join(seg.get("text", "") for seg in segments).strip()
+    return processed_text or ocr.full_text
 
 def _prepare_ocr_variants(image):
     from PIL import ImageFilter, ImageOps
