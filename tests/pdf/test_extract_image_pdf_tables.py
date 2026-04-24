@@ -5,9 +5,8 @@ from PIL import Image
 
 sys.modules.setdefault("pdf2image", SimpleNamespace(convert_from_path=lambda *args, **kwargs: []))
 
-import ansimon_ai.pdf.extract_image_pdf as extract_image_pdf_module
-from ansimon_ai.ocr.types import OCRResult, OCRSegment, OCRTable, OCRTableCell, OCRVertex
-
+import ansimon_ai.pdf.extract_image_pdf as extract_image_pdf_module  # noqa: E402
+from ansimon_ai.ocr.types import OCRResult, OCRSegment, OCRTable, OCRTableCell, OCRVertex  # noqa: E402
 
 def test_extract_text_from_image_pdf_page_formats_table_output(monkeypatch) -> None:
     image = Image.new("RGB", (10, 10), "white")
