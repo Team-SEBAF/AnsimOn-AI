@@ -3,14 +3,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from zipfile import ZipFile
-
 from PIL import Image
 
 import ansimon_ai.pdf.extract_text_docx as extract_text_docx_module
+from ansimon_ai.ocr.types import OCRResult, OCRSegment
 
 
 TEST_TMP_DIR = Path("data/_pdf_test_tmp")
-
 
 def _write_docx_with_images() -> Path:
     TEST_TMP_DIR.mkdir(parents=True, exist_ok=True)
@@ -25,7 +24,6 @@ def _write_docx_with_images() -> Path:
 
     return docx_path
 
-
 def test_extract_text_from_docx_images_uses_shared_ocr_runner(monkeypatch):
     docx_path = _write_docx_with_images()
 
@@ -33,7 +31,15 @@ def test_extract_text_from_docx_images_uses_shared_ocr_runner(monkeypatch):
         assert isinstance(image_input, Image.Image)
         assert engine == "clova"
         assert lang == "kor"
-        return SimpleNamespace(full_text="line one\nline two")
+        return OCRResult(
+            full_text="line one\nline two",
+            segments=[
+                OCRSegment(text="line one"),
+                OCRSegment(text="line two"),
+            ],
+            language="ko",
+            engine="mock",
+        )
 
     monkeypatch.setattr(
         extract_text_docx_module,
@@ -47,7 +53,6 @@ def test_extract_text_from_docx_images_uses_shared_ocr_runner(monkeypatch):
     )
 
     assert texts == ["line one", "line two"]
-
 
 def test_extract_text_from_docx_combines_text_table_and_image_ocr(monkeypatch):
     docx_path = _write_docx_with_images()
@@ -77,8 +82,11 @@ def test_extract_text_from_docx_combines_text_table_and_image_ocr(monkeypatch):
     monkeypatch.setattr(
         extract_text_docx_module,
         "ocr_image_to_result",
-        lambda image_input, *, engine=None, lang=None: SimpleNamespace(
-            full_text="image ocr text"
+        lambda image_input, *, engine=None, lang=None: OCRResult(
+            full_text="image ocr text",
+            segments=[OCRSegment(text="image ocr text")],
+            language="ko",
+            engine="mock",
         ),
     )
 

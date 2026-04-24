@@ -7,6 +7,7 @@ pytest.importorskip("pdfplumber")
 from ansimon_ai.pdf.extract_text_auto import extract_text_auto
 import ansimon_ai.pdf.extract_text_auto as extract_text_auto_module
 import ansimon_ai.pdf.extract_image_pdf as extract_image_pdf_module
+from ansimon_ai.ocr.types import OCRResult, OCRSegment
 
 @pytest.mark.parametrize(
     "pdf_path",
@@ -63,7 +64,12 @@ def test_extract_text_from_image_pdf_page_uses_shared_ocr_runner(monkeypatch):
         assert image_input is image
         assert engine == "clova"
         assert lang == "kor"
-        return type("MockResult", (), {"full_text": "pdf-ocr-text"})()
+        return OCRResult(
+            full_text="pdf-ocr-text",
+            segments=[OCRSegment(text="pdf-ocr-text")],
+            language="ko",
+            engine="mock",
+        )
 
     monkeypatch.setattr(
         extract_image_pdf_module,
