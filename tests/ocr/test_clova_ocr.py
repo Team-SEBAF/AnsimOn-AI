@@ -1,3 +1,5 @@
+from PIL import Image
+
 from ansimon_ai.ocr.clova_ocr import _parse_clova_ocr_response
 from ansimon_ai.ocr.layout import assign_speaker_sides
 from ansimon_ai.ocr.from_ocr import ocr_image_to_result
@@ -67,11 +69,26 @@ def test_ocr_image_to_result_uses_clova_when_engine_env_is_set(monkeypatch):
     monkeypatch.setenv("OCR_ENGINE", "clova")
     monkeypatch.setattr(
         "ansimon_ai.ocr.from_ocr.clova_ocr_image_to_result",
-        lambda image_path: expected,
+        lambda image_input: expected,
     )
 
     assert ocr_image_to_result("dummy.png") is expected
 
+def test_ocr_image_to_result_accepts_pil_image(monkeypatch):
+    expected = object()
+    image = Image.new("RGB", (8, 8), "white")
+
+    def fake_clova(image_input, *, lang="ko"):
+        assert isinstance(image_input, Image.Image)
+        assert lang == "ko"
+        return expected
+
+    monkeypatch.setattr(
+        "ansimon_ai.ocr.from_ocr.clova_ocr_image_to_result",
+        fake_clova,
+    )
+
+    assert ocr_image_to_result(image, engine="clova", lang="kor") is expected
 
 def test_ocr_segment_coordinate_properties():
     segment = OCRSegment(
