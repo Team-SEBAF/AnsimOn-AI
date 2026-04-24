@@ -1,15 +1,20 @@
 import base64
 import os
 import time
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Optional
 from uuid import uuid4
 
+from PIL import Image as PILImage
+
 from .layout import assign_speaker_sides
 from .types import OCRResult, OCRSegment, OCRVertex
 
+ImageInput = str | Path | PILImage.Image
+
 def clova_ocr_image_to_result(
-    image_path: str,
+    image_input: ImageInput,
     *,
     invoke_url: Optional[str] = None,
     secret: Optional[str] = None,
@@ -32,9 +37,7 @@ def clova_ocr_image_to_result(
         raise ValueError("CLOVA_OCR_SECRET is required.")
 
     request_url = _resolve_general_url(resolved_invoke_url)
-    file_path = Path(image_path)
-    image_bytes = file_path.read_bytes()
-    image_format = _infer_image_format(file_path)
+    image_bytes, image_format, image_name = _read_image_input(image_input)
 
     payload = {
         "version": "V2",
@@ -44,7 +47,7 @@ def clova_ocr_image_to_result(
         "images": [
             {
                 "format": image_format,
-                "name": file_path.name,
+                "name": image_name,
                 "data": base64.b64encode(image_bytes).decode("ascii"),
             }
         ],
@@ -89,6 +92,15 @@ def _infer_image_format(path: Path) -> str:
     if suffix not in mapping:
         raise ValueError(f"Unsupported image format for CLOVA OCR: {suffix}")
     return mapping[suffix]
+
+def _read_image_input(image_input: ImageInput) -> tuple[bytes, str, str]:
+    if isinstance(image_input, PILImage.Image):
+        buffer = BytesIO()
+        image_input.save(buffer, format="PNG")
+        return buffer.getvalue(), "png", "image.png"
+
+    file_path = Path(image_input)
+    return file_path.read_bytes(), _infer_image_format(file_path), file_path.name
 
 def _parse_clova_ocr_response(data: dict[str, Any]) -> OCRResult:
     images = data.get("images")
