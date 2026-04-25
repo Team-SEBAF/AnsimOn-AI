@@ -47,3 +47,4 @@ def test_build_structuring_input_from_stt_preserves_speaker_labels() -> None:
 
     assert struct_input.segments[0].speaker == "SPEAKER_00"
     assert struct_input.segments[1].speaker == "SPEAKER_01"
+    assert struct_input.full_text == stt_result.full_text
