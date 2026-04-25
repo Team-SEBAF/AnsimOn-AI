@@ -3,5 +3,6 @@
     "python.analysis.extraPaths": [
         "./src"
     ],
-    "python.analysis.diagnosticMode": "workspace"
+    "python.analysis.diagnosticMode": "workspace",
+    "python.terminal.useEnvFile": true
 }
