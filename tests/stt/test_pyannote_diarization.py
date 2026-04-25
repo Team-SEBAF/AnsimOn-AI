@@ -80,7 +80,9 @@ def test_pyannote_diarizer_parses_pyannote4_output() -> None:
 
     assert [segment.speaker for segment in segments] == ["SPEAKER_00", "SPEAKER_01"]
 
-def test_pyannote_diarizer_falls_back_to_audio_path_when_loader_fails() -> None:
+def test_pyannote_diarizer_falls_back_to_audio_path_when_loader_fails(monkeypatch) -> None:
+    monkeypatch.delenv("DIARIZATION_MIN_SPEAKERS", raising=False)
+    monkeypatch.delenv("DIARIZATION_MAX_SPEAKERS", raising=False)
     pipeline = FakePipeline()
 
     diarizer = PyannoteDiarizer(
