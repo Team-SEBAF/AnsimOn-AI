@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable
+from uuid import UUID
 
 from dotenv import load_dotenv
 
@@ -22,6 +23,7 @@ def get_or_create_structured_result(
     struct_input: StructuringInput,
     call_fn: Callable[[StructuringInput], dict],
     *,
+    complaint_id: UUID | None = None,
     schema_version: str = SCHEMA_VERSION,
     prompt_version: str = PROMPT_VERSION,
     storage_path_fn: Callable[[str, str], Path] | None = None,
@@ -61,6 +63,8 @@ def get_or_create_structured_result(
         save_structured_result(path, payload)
     else:
         from ansimon_ai.caching import cache_json
-        cache_json(input_hash, payload)
+        if complaint_id is None:
+            raise ValueError("complaint_id is required")
+        cache_json(input_hash, payload, complaint_id=complaint_id)
 
     return payload
