@@ -4,6 +4,7 @@ import pytest
 
 from ansimon_ai.structuring.cache.manager import get_or_create_structured_result
 from ansimon_ai.structuring.types import StructuringInput
+from ansimon_ai.structuring.versions import PROMPT_VERSION, SCHEMA_VERSION
 
 def _make_input(text: str) -> StructuringInput:
     return StructuringInput(
@@ -27,15 +28,15 @@ def test_cache_miss_creates_and_saves(tmp_path: Path):
     result = get_or_create_structured_result(
         _make_input("hello"),
         fake_call,
-        schema_version="v1.3",
-        prompt_version="system_prompt_v0",
+        schema_version=SCHEMA_VERSION,
+        prompt_version=PROMPT_VERSION,
         storage_path_fn=path_fn,
     )
 
     assert call_count["n"] == 1
     assert "result" in result
     assert result["result"] == {"ok": True}
-    assert (tmp_path / "v1.3").exists()
+    assert (tmp_path / SCHEMA_VERSION).exists()
 
 def test_cache_hit_skips_call(tmp_path: Path):
     call_count = {"n": 0}
@@ -75,7 +76,7 @@ def test_prompt_version_change_causes_cache_miss(tmp_path: Path):
     get_or_create_structured_result(
         _make_input("hello"),
         fake_call,
-        prompt_version="system_prompt_v0",
+        prompt_version=PROMPT_VERSION,
         storage_path_fn=path_fn,
     )
 
@@ -104,7 +105,7 @@ def test_broken_cache_file_raises_and_allows_regeneration(tmp_path: Path):
         storage_path_fn=path_fn,
     )
 
-    files = list((tmp_path / "v1.3").glob("*.json"))
+    files = list((tmp_path / SCHEMA_VERSION).glob("*.json"))
     assert len(files) == 1
 
     with files[0].open("w", encoding="utf-8") as f:
