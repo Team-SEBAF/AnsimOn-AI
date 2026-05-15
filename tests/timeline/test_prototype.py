@@ -1271,6 +1271,49 @@ def test_build_timeline_prototype_reuses_cached_results_for_victim_image():
     assert first_request_count == 1
     assert added_requests_on_second_run == 1
 
+def test_build_timeline_prototype_separates_victim_cache_by_evidence_id():
+    llm_client = CountingLLMClient()
+    cache = InMemoryCache()
+
+    shared_bytes = b"same-victim-image"
+    first_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="VICTIM",
+                file_format="IMAGE",
+                file_name="victim-a.jpg",
+                file_bytes=shared_bytes,
+            ),
+        ],
+    )
+    second_payload = TimelinePrototypeAiInput(
+        complaint_id=uuid4(),
+        evidences=[
+            TimelinePrototypeEvidenceInput(
+                evidence_id=uuid4(),
+                type="VICTIM",
+                file_format="IMAGE",
+                file_name="victim-b.jpg",
+                file_bytes=shared_bytes,
+            ),
+        ],
+    )
+
+    build_timeline_prototype(
+        first_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+    build_timeline_prototype(
+        second_payload,
+        llm_client=llm_client,
+        cache=cache,
+    )
+
+    assert llm_client.call_count == 2
+
 def test_build_timeline_prototype_reuses_cached_results_for_victim_video(monkeypatch):
     llm_client = CountingLLMClient()
     cache = InMemoryCache()

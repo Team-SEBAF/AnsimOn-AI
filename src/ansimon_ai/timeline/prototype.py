@@ -496,6 +496,7 @@ def _compute_victim_cache_key(
 
     file_hash = hashlib.sha256(evidence.file_bytes).hexdigest()
     payload = {
+        "evidence_id": str(evidence.evidence_id),
         "type": evidence.type,
         "file_format": evidence.file_format,
         "file_hash": file_hash,
