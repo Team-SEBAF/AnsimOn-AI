@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 
 from ansimon_ai.structuring.types import StructuringInput
 from ansimon_ai.structuring.cache.hash import compute_input_hash
+from ansimon_ai.structuring.versions import PROMPT_VERSION, SCHEMA_VERSION
 from ansimon_ai.structuring.cache.storage import (
     load_structured_result,
     save_structured_result,
@@ -21,8 +22,8 @@ def get_or_create_structured_result(
     struct_input: StructuringInput,
     call_fn: Callable[[StructuringInput], dict],
     *,
-    schema_version: str = "v1.3",
-    prompt_version: str = "system_prompt_v0",
+    schema_version: str = SCHEMA_VERSION,
+    prompt_version: str = PROMPT_VERSION,
     storage_path_fn: Callable[[str, str], Path] | None = None,
 ) -> dict:
     input_hash = compute_input_hash(
