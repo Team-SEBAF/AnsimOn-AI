@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from uuid import uuid4
 import pytest
 
 from ansimon_ai.structuring.cache.manager import get_or_create_structured_result
@@ -117,3 +118,29 @@ def test_broken_cache_file_raises_and_allows_regeneration(tmp_path: Path):
             fake_call,
             storage_path_fn=path_fn,
         )
+
+def test_evidence_id_change_causes_cache_miss(tmp_path: Path):
+    call_count = {"n": 0}
+
+    def fake_call(_):
+        call_count["n"] += 1
+        return {"ok": True}
+
+    def path_fn(schema_version: str, input_hash: str) -> Path:
+        return tmp_path / schema_version / f"{input_hash}.json"
+
+    get_or_create_structured_result(
+        _make_input("hello"),
+        fake_call,
+        evidence_id=uuid4(),
+        storage_path_fn=path_fn,
+    )
+
+    get_or_create_structured_result(
+        _make_input("hello"),
+        fake_call,
+        evidence_id=uuid4(),
+        storage_path_fn=path_fn,
+    )
+
+    assert call_count["n"] == 2

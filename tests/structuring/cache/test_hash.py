@@ -1,8 +1,8 @@
 from datetime import datetime
+from uuid import uuid4
 
 from ansimon_ai.structuring.cache.hash import compute_input_hash
 from ansimon_ai.structuring.types import StructuringInput, StructuringSegment
-
 
 def test_compute_input_hash_accepts_datetime_timestamps() -> None:
     struct_input = StructuringInput(
@@ -28,3 +28,27 @@ def test_compute_input_hash_accepts_datetime_timestamps() -> None:
 
     assert isinstance(result, str)
     assert result
+
+def test_compute_input_hash_changes_when_evidence_id_changes() -> None:
+    struct_input = StructuringInput(
+        modality="text",
+        source_type="document",
+        language="ko",
+        full_text="same evidence content",
+        segments=[],
+    )
+
+    first_hash = compute_input_hash(
+        struct_input,
+        schema_version="v1.5",
+        prompt_version="v1.2",
+        evidence_id=uuid4(),
+    )
+    second_hash = compute_input_hash(
+        struct_input,
+        schema_version="v1.5",
+        prompt_version="v1.2",
+        evidence_id=uuid4(),
+    )
+
+    assert first_hash != second_hash
