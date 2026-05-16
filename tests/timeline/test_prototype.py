@@ -15,6 +15,7 @@ from ansimon_ai.timeline import (
     build_timeline_event_evidences,
     build_timeline_prototype,
 )
+from ansimon_ai.timeline.prototype import _build_tags
 
 TEST_TMP_DIR = Path("data/_timeline_test_tmp")
 
@@ -762,6 +763,65 @@ def test_build_timeline_prototype_prefers_llm_tags():
 
     assert evidence_result.tags == ["repeat", "threat"]
     assert timeline_evidence.tags == ["repeat", "threat"]
+
+def test_build_tags_drops_threat_for_defensive_reporting_stt_response():
+    evidence = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VOICE",
+        file_format="AUDIO",
+        extracted_text="차단된 것 같아 다른 번호로 전화했다. 바로 신고한다.",
+    )
+    structured_data = {
+        "threat_indicators": {
+            "value": ["바로 신고한다", "진짜 끝까지 간다"],
+        },
+        "action_types": {
+            "value": ["contact"],
+        },
+        "tags": {
+            "value": ["threat"],
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        evidence=evidence,
+        source_type="stt",
+        normalized_text=(
+            "차단된 것 같아 다른 번호로 전화했다는 발언 뒤 "
+            "바로 신고한다는 대응이 있었다."
+        ),
+    )
+
+    assert tags == []
+
+def test_build_tags_keeps_threat_for_direct_harm_stt_expression():
+    evidence = TimelinePrototypeEvidenceInput(
+        evidence_id=uuid4(),
+        type="VOICE",
+        file_format="AUDIO",
+        extracted_text="차단해도 다른 번호로 전화할 거고 찾아갈 거야.",
+    )
+    structured_data = {
+        "threat_indicators": {
+            "value": ["찾아갈 거야"],
+        },
+        "action_types": {
+            "value": ["contact", "threat"],
+        },
+        "tags": {
+            "value": ["threat"],
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        evidence=evidence,
+        source_type="stt",
+        normalized_text="차단해도 다른 번호로 전화할 거고 찾아갈 거야.",
+    )
+
+    assert tags == ["threat"]
 
 class VictimImageLLMClient:
     def generate(self, messages: list[dict]) -> str:

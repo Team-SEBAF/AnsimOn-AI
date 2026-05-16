@@ -183,7 +183,12 @@ def process_single_evidence(
             normalized_text,
             structuring_result.output_json,
         )
-        tags = _build_tags(structuring_result.output_json)
+        tags = _build_tags(
+            structuring_result.output_json,
+            evidence=evidence,
+            source_type=source_type,
+            normalized_text=normalized_text,
+        )
         timestamp = _extract_primary_timestamp(struct_input)
         if timestamp is None:
             timestamp = evidence.file_created_at
@@ -652,7 +657,13 @@ def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
 
     return value
 
-def _build_tags(structured_data: Optional[dict]) -> List[str]:
+def _build_tags(
+    structured_data: Optional[dict],
+    *,
+    evidence: Optional[TimelinePrototypeEvidenceInput] = None,
+    source_type: Optional[str] = None,
+    normalized_text: str = "",
+) -> List[str]:
     if not isinstance(structured_data, dict):
         return []
 
@@ -667,9 +678,101 @@ def _build_tags(structured_data: Optional[dict]) -> List[str]:
     allowed = {"repeat", "physical", "threat", "sexual_insult", "refusal"}
     result: List[str] = []
     for tag in value:
-        if isinstance(tag, str) and tag in allowed and tag not in result:
-            result.append(tag)
+        if not isinstance(tag, str) or tag not in allowed or tag in result:
+            continue
+        if _should_drop_defensive_stt_threat_tag(
+            tag,
+            evidence=evidence,
+            source_type=source_type,
+            normalized_text=normalized_text,
+            structured_data=structured_data,
+        ):
+            continue
+        result.append(tag)
     return result
+
+def _should_drop_defensive_stt_threat_tag(
+    tag: str,
+    *,
+    evidence: Optional[TimelinePrototypeEvidenceInput],
+    source_type: Optional[str],
+    normalized_text: str,
+    structured_data: dict,
+) -> bool:
+    if tag != "threat":
+        return False
+    if evidence is None or evidence.type != "VOICE" or source_type != "stt":
+        return False
+
+    combined_text = " ".join(
+        [
+            normalized_text,
+            *_extract_structured_list_values(structured_data, "threat_indicators"),
+            *_extract_structured_list_values(structured_data, "action_types"),
+        ]
+    )
+    if not combined_text:
+        return False
+
+    has_block_bypass_context = _contains_any(
+        combined_text,
+        (
+            "차단",
+            "다른 번호",
+            "모르는 번호",
+            "낯선 번호",
+            "번호로 연락",
+            "번호로 전화",
+        ),
+    )
+    has_defensive_reporting = _contains_any(
+        combined_text,
+        (
+            "신고",
+            "고소",
+            "경찰",
+            "법적",
+            "끝까지 간다",
+            "끝까지 갈",
+            "끝까지 가",
+        ),
+    )
+    if not has_block_bypass_context or not has_defensive_reporting:
+        return False
+
+    return not _contains_direct_threat_expression(combined_text)
+
+def _extract_structured_list_values(structured_data: dict, key: str) -> List[str]:
+    field = structured_data.get(key)
+    if not isinstance(field, dict):
+        return []
+
+    value = field.get("value")
+    if isinstance(value, list):
+        return [item for item in value if isinstance(item, str)]
+    if isinstance(value, str):
+        return [value]
+    return []
+
+def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
+    return any(term in text for term in terms)
+
+def _contains_direct_threat_expression(text: str) -> bool:
+    direct_threat_terms = (
+        "죽인다",
+        "죽일",
+        "죽여",
+        "해치",
+        "뒤지게",
+        "때려",
+        "맞고싶",
+        "찾아갈",
+        "가만 안",
+        "가만두지",
+        "불이익",
+        "보복",
+    )
+    return _contains_any(text, direct_threat_terms)
 
 def _extract_primary_timestamp(struct_input: StructuringInput):
     first_timestamp = None
