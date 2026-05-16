@@ -21,6 +21,13 @@ def test_build_structuring_messages_smoke():
     assert struct_input.full_text in messages[1]["content"]
     assert "SEGMENTS" in messages[1]["content"]
 
+def test_system_prompt_guides_ocr_chat_sender_direction():
+    system_prompt = load_system_prompt()
+
+    assert "`이름에게 보냈다`" in system_prompt
+    assert "`지언에게 보낸 메시지`" in system_prompt
+    assert "반복 연락 중 나온 호소성·압박성 발화" in system_prompt
+
 def test_build_structuring_messages_includes_speaker_labeled_transcript_for_stt():
     stt_result = STTResult(
         full_text="전화를 건 쪽이 물었다. 상대가 거절했다.",
