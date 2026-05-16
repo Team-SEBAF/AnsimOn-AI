@@ -1310,7 +1310,7 @@ class InMemoryCache:
 def test_build_timeline_prototype_reuses_cached_results_for_existing_evidence(monkeypatch):
     monkeypatch.setattr(
         "ansimon_ai.structuring.run.compute_input_hash",
-        lambda input, schema_version, prompt_version: input.full_text,
+        lambda input, schema_version, prompt_version, evidence_id=None: input.full_text,
     )
 
     llm_client = CountingLLMClient()
@@ -1372,7 +1372,7 @@ def test_build_timeline_prototype_reuses_cached_results_by_type(
 ):
     monkeypatch.setattr(
         "ansimon_ai.structuring.run.compute_input_hash",
-        lambda input, schema_version, prompt_version: input.full_text,
+        lambda input, schema_version, prompt_version, evidence_id=None: input.full_text,
     )
 
     llm_client = CountingLLMClient()
