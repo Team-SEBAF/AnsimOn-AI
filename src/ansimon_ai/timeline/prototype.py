@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 import hashlib
 import json
+import re
 import shutil
 from collections.abc import Callable
 from functools import partial
@@ -337,7 +338,9 @@ def _process_victim_evidence(
         except OSError:
             pass
 
-    description = _build_description(evidence, "", structured_data)
+    description = _clean_victim_description(
+        _build_description(evidence, "", structured_data)
+    )
     normalized_text = description or (evidence.file_name or str(evidence.evidence_id))
 
     return EvidenceProcessingResult(
@@ -643,6 +646,29 @@ def _build_description(
         return text
     return f"{text[:limit].rstrip()}..."
 
+def _clean_victim_description(description: str) -> str:
+    if not description:
+        return description
+
+    sentences = [sentence.strip() for sentence in re.split(r"(?<=[.!?。！？습니다])\s+", description.strip()) if sentence.strip()]
+    if len(sentences) <= 1:
+        return "" if _is_incidental_hand_sentence(description) else description
+
+    kept = [sentence for sentence in sentences if not _is_incidental_hand_sentence(sentence)]
+    return " ".join(kept).strip()
+
+def _is_incidental_hand_sentence(sentence: str) -> bool:
+    if not _contains_any(sentence, ("손가락", "손")):
+        return False
+
+    if _contains_any(sentence, ("멍", "변색", "상처", "출혈", "부기", "붓", "찰과상")):
+        return False
+
+    return _contains_any(
+        sentence,
+        ("가리키", "짚고", "짚은", "지목", "포함", "보입니다", "나와 있습니다"),
+    )
+
 def _extract_timeline_summary(structured_data: Optional[dict]) -> dict:
     if not isinstance(structured_data, dict):
         return {}
@@ -749,8 +775,10 @@ def _should_drop_weak_sexual_insult_tag(
             "모욕",
         ),
     )
-    if has_sexual_context or has_direct_insult:
+    if has_sexual_context:
         return False
+    if has_direct_insult:
+        return _is_third_party_or_comparison_insult(combined_text)
 
     weak_grievance_context = _contains_any(
         combined_text,
@@ -767,6 +795,73 @@ def _should_drop_weak_sexual_insult_tag(
         ),
     )
     return weak_grievance_context
+
+def _is_third_party_or_comparison_insult(text: str) -> bool:
+    third_party_context = _contains_any(
+        text,
+        (
+            "특정인을 비하",
+            "특정인 비하",
+            "제3자",
+            "다른 사람",
+            "선배",
+            "걔",
+            "쟤",
+            "그 사람",
+        ),
+    )
+    comparison_grievance_context = _contains_any(
+        text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "기분 더럽",
+            "불만",
+            "대우",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비교",
+        ),
+    )
+    if third_party_context and comparison_grievance_context:
+        return True
+
+    if _contains_any(
+        text,
+        (
+            "피해자를",
+            "피해자한테",
+            "너는",
+            "너를",
+            "너한테",
+            "너 같은",
+            "당신",
+        ),
+    ):
+        return False
+
+    return _contains_any(
+        text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "기분 더럽",
+            "불만",
+            "대우",
+            "다른 사람",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비하",
+            "특정인",
+            "제3자",
+            "선배",
+            "걔",
+            "쟤",
+            "그 사람",
+        ),
+    )
 
 def _has_refusal_evidence(structured_data: dict, normalized_text: str) -> bool:
     refusal_signal = structured_data.get("refusal_signal")

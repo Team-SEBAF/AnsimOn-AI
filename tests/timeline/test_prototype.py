@@ -15,7 +15,7 @@ from ansimon_ai.timeline import (
     build_timeline_event_evidences,
     build_timeline_prototype,
 )
-from ansimon_ai.timeline.prototype import _build_tags
+from ansimon_ai.timeline.prototype import _build_tags, _clean_victim_description
 
 TEST_TMP_DIR = Path("data/_timeline_test_tmp")
 
@@ -531,6 +531,31 @@ def test_build_timeline_prototype_processes_victim_image_with_vision_client():
     assert timeline_evidence.title == evidence_result.title
     assert timeline_evidence.tags == ["physical"]
 
+def test_clean_victim_description_removes_pointing_gesture_sentence():
+    description = (
+        "팔의 안쪽 굽힘 부위에 붉은색·자주색의 멍과 주변에 황색 변색이 관찰됩니다. "
+        "한 손가락이 해당 부위를 가리키고 있습니다."
+    )
+
+    assert _clean_victim_description(description) == (
+        "팔의 안쪽 굽힘 부위에 붉은색·자주색의 멍과 주변에 황색 변색이 관찰됩니다."
+    )
+
+def test_clean_victim_description_removes_incidental_finger_sentence():
+    description = (
+        "근접 촬영된 피부에 불규칙한 자주빛·붉은빛의 변색(멍)이 관찰됩니다. "
+        "손가락 일부가 사진에 포함되어 있습니다."
+    )
+
+    assert _clean_victim_description(description) == (
+        "근접 촬영된 피부에 불규칙한 자주빛·붉은빛의 변색(멍)이 관찰됩니다."
+    )
+
+def test_clean_victim_description_keeps_hand_injury_sentence():
+    description = "손등에 붉은 멍과 변색이 관찰됩니다."
+
+    assert _clean_victim_description(description) == description
+
 def test_build_timeline_prototype_processes_victim_video_with_vision_client(monkeypatch):
     video_path = _write_test_file(f"{uuid4()}-victim.mp4", b"fake-video-bytes")
     frame_one = _write_test_file(f"{uuid4()}-frame1.jpg", b"frame-1")
@@ -874,6 +899,60 @@ def test_build_tags_drops_sexual_insult_for_relation_grievance_message():
 
     assert tags == []
 
+def test_build_tags_drops_sexual_insult_for_third_party_insult():
+    structured_data = {
+        "tags": {
+            "value": ["sexual_insult"],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "답변 요구·모욕적 메시지",
+                "description": (
+                    "상대방이 여러 차례 메시지를 보내며 선배와의 관계를 비교했습니다. "
+                    "상대방이 비하 표현을 사용하며 기분이 더럽다는 취지로 표현했습니다."
+                ),
+            },
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        normalized_text=(
+            "쟤랑은 웃고 재밌게 지내면서 저한테는 그렇게 선 긋고 "
+            "제가 무시당해서 기분 더럽다."
+        ),
+    )
+
+    assert tags == []
+
+def test_build_tags_drops_sexual_insult_when_message_to_victim_insults_third_party():
+    structured_data = {
+        "tags": {
+            "value": ["sexual_insult"],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "상대방의 모욕적 발언",
+                "description": (
+                    "상대방이 피해자에게 특정인을 비하하는 표현('년')을 사용하며 "
+                    "비교·비난하는 내용의 메시지를 보냈습니다. 메시지에서 상대방은 "
+                    "피해자와 다른 사람의 관계 차이를 지적하며 기분이 더럽다고 언급했습니다."
+                ),
+            },
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        normalized_text=(
+            "선배 현지랑은 잘 지내시던데 저랑 뭐가 그렇게 다른데요? "
+            "그 년이랑 저랑 뭐가 다른 건지 모르겠는데요. "
+            "저한테는 선 긋고 걔랑은 아무렇지도 않게 지내는 거 보면 제가 만만한 거겠죠."
+        ),
+    )
+
+    assert tags == []
+
 def test_build_tags_keeps_sexual_insult_for_explicit_sexual_expression():
     structured_data = {
         "tags": {
@@ -888,6 +967,26 @@ def test_build_tags_keeps_sexual_insult_for_explicit_sexual_expression():
     }
 
     tags = _build_tags(structured_data, normalized_text="야한 사진 보내줘")
+
+    assert tags == ["sexual_insult"]
+
+def test_build_tags_keeps_sexual_insult_for_victim_directed_insult():
+    structured_data = {
+        "tags": {
+            "value": ["sexual_insult"],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "모욕적 메시지",
+                "description": "상대방이 피해자에게 모욕적인 표현을 보냈습니다.",
+            },
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        normalized_text="너 같은 새끼는 처음 봤다.",
+    )
 
     assert tags == ["sexual_insult"]
 

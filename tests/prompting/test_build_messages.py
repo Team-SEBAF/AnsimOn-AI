@@ -26,7 +26,27 @@ def test_system_prompt_guides_ocr_chat_sender_direction():
 
     assert "`이름에게 보냈다`" in system_prompt
     assert "`지언에게 보낸 메시지`" in system_prompt
-    assert "반복 연락 중 나온 호소성·압박성 발화" in system_prompt
+    assert "반복 연락 중 나온 호소성·압박성 말" in system_prompt
+
+def test_system_prompt_guides_missed_call_document_tone():
+    system_prompt = load_system_prompt()
+
+    assert "`반복 연락 시도`" in system_prompt
+    assert "제출형 문체" in system_prompt
+
+def test_system_prompt_avoids_stt_analytic_subjects():
+    system_prompt = load_system_prompt()
+
+    assert "`응답 측`" in system_prompt
+    assert "`연락받은 쪽`" in system_prompt
+    assert "`한쪽`" in system_prompt
+    assert "`한 사람`" in system_prompt
+    assert "`다른 사람`" in system_prompt
+    assert "`전화를 건 측`" in system_prompt
+    assert "`한쪽의 발화`" in system_prompt
+    assert "`신고하겠다는 대응`" in system_prompt
+    assert "번호·계정 변경" in system_prompt
+    assert "접촉을 지속한 `상대방`" in system_prompt
 
 def test_build_structuring_messages_includes_speaker_labeled_transcript_for_stt():
     stt_result = STTResult(
@@ -45,6 +65,11 @@ def test_build_structuring_messages_includes_speaker_labeled_transcript_for_stt(
     user_content = messages[1]["content"]
 
     assert "SPEAKER ATTRIBUTION NOTE" in user_content
+    assert "Use `피해자` or `상대방`" in user_content
+    assert "`전화를 건 측`" in user_content
+    assert "`한 사람`" in user_content
+    assert "changed number/account" in user_content
+    assert "contact-continuing `상대방`" in user_content
     assert "SPEAKER_01: 왜 불편한지 모르겠어요." in user_content
     assert "SPEAKER_01: 다시 연락할게요." in user_content
     assert "SPEAKER-LABELED TRANSCRIPT" in user_content
