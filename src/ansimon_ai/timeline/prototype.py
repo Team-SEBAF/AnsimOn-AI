@@ -688,8 +688,134 @@ def _build_tags(
             structured_data=structured_data,
         ):
             continue
+        if _should_drop_weak_sexual_insult_tag(
+            tag,
+            normalized_text=normalized_text,
+            structured_data=structured_data,
+        ):
+            continue
         result.append(tag)
+
+    if "refusal" not in result and _has_refusal_evidence(structured_data, normalized_text):
+        result.append("refusal")
     return result
+
+def _should_drop_weak_sexual_insult_tag(
+    tag: str,
+    *,
+    normalized_text: str,
+    structured_data: dict,
+) -> bool:
+    if tag != "sexual_insult":
+        return False
+
+    combined_text = _build_tag_context_text(structured_data, normalized_text)
+    if not combined_text:
+        return False
+
+    has_sexual_context = _contains_any(
+        combined_text,
+        (
+            "성적",
+            "성희롱",
+            "성추행",
+            "성폭력",
+            "음란",
+            "야한",
+            "몸매",
+            "가슴",
+            "엉덩이",
+            "벗어",
+            "만져",
+            "키스",
+            "자자",
+            "잘래",
+            "성관계",
+            "섹스",
+            "야동",
+        ),
+    )
+    has_direct_insult = _contains_any(
+        combined_text,
+        (
+            "미친",
+            "병신",
+            "새끼",
+            "걸레",
+            "창녀",
+            "변태",
+            "더럽",
+            "꺼져",
+            "모욕",
+        ),
+    )
+    if has_sexual_context or has_direct_insult:
+        return False
+
+    weak_grievance_context = _contains_any(
+        combined_text,
+        (
+            "무시당",
+            "기분 나쁘",
+            "불만",
+            "대우",
+            "다른 사람",
+            "사이가 다르",
+            "관계",
+            "서운",
+            "비하",
+        ),
+    )
+    return weak_grievance_context
+
+def _has_refusal_evidence(structured_data: dict, normalized_text: str) -> bool:
+    refusal_signal = structured_data.get("refusal_signal")
+    if isinstance(refusal_signal, dict) and refusal_signal.get("value") == "explicit":
+        return True
+
+    summary = _extract_timeline_summary(structured_data)
+    combined_text = " ".join(
+        value
+        for value in (summary.get("title"), summary.get("description"))
+        if isinstance(value, str)
+    )
+    return _contains_any(
+        combined_text,
+        (
+            "그만해",
+            "그만 하",
+            "그만",
+            "멈춰 달",
+            "멈춰달",
+            "멈춰",
+            "중단 요청",
+            "중단 의사",
+            "중단 요구",
+            "연락 중단",
+            "연락을 끊",
+            "연락하지 말",
+            "하지 말",
+            "하지마",
+            "거절",
+        ),
+    )
+
+def _build_tag_context_text(structured_data: dict, normalized_text: str) -> str:
+    summary = _extract_timeline_summary(structured_data)
+    summary_text = " ".join(
+        value
+        for value in (summary.get("title"), summary.get("description"))
+        if isinstance(value, str)
+    )
+    return " ".join(
+        [
+            normalized_text,
+            summary_text,
+            *_extract_structured_list_values(structured_data, "action_types"),
+            *_extract_structured_list_values(structured_data, "threat_indicators"),
+            *_extract_structured_list_values(structured_data, "impact_on_victim"),
+        ]
+    )
 
 def _should_drop_defensive_stt_threat_tag(
     tag: str,

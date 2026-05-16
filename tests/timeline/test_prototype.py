@@ -823,6 +823,74 @@ def test_build_tags_keeps_threat_for_direct_harm_stt_expression():
 
     assert tags == ["threat"]
 
+def test_build_tags_adds_refusal_when_summary_has_clear_stop_request():
+    structured_data = {
+        "refusal_signal": {
+            "value": "unknown",
+        },
+        "tags": {
+            "value": [],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "사진 전송 중단 요청",
+                "description": (
+                    "사진 전송을 멈춰 달라고 반복해서 요청하며 "
+                    "정서적 어려움을 호소하는 발언이 있습니다."
+                ),
+            },
+        },
+    }
+
+    tags = _build_tags(structured_data, normalized_text="")
+
+    assert tags == ["refusal"]
+
+def test_build_tags_drops_sexual_insult_for_relation_grievance_message():
+    structured_data = {
+        "tags": {
+            "value": ["sexual_insult"],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "상대방의 불만 메시지",
+                "description": (
+                    "상대방이 피해자에게 다른 사람과의 대우가 다르다며 "
+                    "불만을 표현했습니다. 특정인을 비하하는 표현을 사용하고 "
+                    "자신에게 무시한다고 말했습니다."
+                ),
+            },
+        },
+    }
+
+    tags = _build_tags(
+        structured_data,
+        normalized_text=(
+            "쟤랑은 웃고 재밌게 지내면서 저한테는 그렇게 선 긋고 "
+            "제 말은 재밌어하지도 않게 지내는 걸 보면 제가 무시당해서 "
+            "기분 나쁜 거뿐인데요."
+        ),
+    )
+
+    assert tags == []
+
+def test_build_tags_keeps_sexual_insult_for_explicit_sexual_expression():
+    structured_data = {
+        "tags": {
+            "value": ["sexual_insult"],
+        },
+        "timeline_summary": {
+            "value": {
+                "title": "성적 표현이 담긴 메시지",
+                "description": "야한 사진을 보내 달라는 성적 표현이 포함되어 있습니다.",
+            },
+        },
+    }
+
+    tags = _build_tags(structured_data, normalized_text="야한 사진 보내줘")
+
+    assert tags == ["sexual_insult"]
+
 class VictimImageLLMClient:
     def generate(self, messages: list[dict]) -> str:
         user_message = messages[1]
